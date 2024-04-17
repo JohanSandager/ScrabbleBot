@@ -29,11 +29,13 @@ module internal MultiSet
     let fold (f : 'b -> 'a -> uint32 -> 'b) (acc : 'b) (R(s)) = Map.fold f acc s
     let foldBack (f : 'a -> uint32 -> 'b -> 'b) (R(s)) (acc: 'b) = Map.foldBack f s acc
     
-    let ofList (_ : 'a list) : MultiSet<'a> = empty
-    let toList (_ : MultiSet<'a>) : 'a list = []
+    let ofList (lst : 'a list) : MultiSet<'a> = 
+        List.fold (fun acc value -> addSingle value acc) empty lst
+    let toList (s : MultiSet<'a>) : 'a list = 
+        fold (fun acc x y -> (List.init (int(y)) (fun _ -> x)) @ acc) [] s |> List.rev
 
-
-    let map (_ : 'a -> 'b) (_ : MultiSet<'a>) : MultiSet<'b> = empty
+    let map (f : 'a -> 'b) (s : MultiSet<'a>) : MultiSet<'b> = 
+        s |> toList |> List.map f |> ofList
 
     let union (_ : MultiSet<'a>) (_ : MultiSet<'a>) : MultiSet<'a> = empty
     let sum (_ : MultiSet<'a>) (_ : MultiSet<'a>) : MultiSet<'a> = empty
