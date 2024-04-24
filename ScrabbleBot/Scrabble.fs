@@ -8,6 +8,16 @@ open System.IO
 open ScrabbleUtil.DebugPrint
 
 // The RegEx module is only used to parse human input. It is not used for the final product.
+// let bruteForce (hand: MultiSet<uint32>) (pieces: Map<uint32, 'a>) (st: State.state) =
+//toList hand |> List.head |> getPiece pieces
+
+//fold (fun _ x -> if (ScrabbleUtil.Dictionary.lookup (getCharacter x) st.dict) then forcePrint("match found!")) () hand
+
+
+(*let rec aux c = 
+            match ScrabbleUtil.Dictionary.lookup st.dict (getCharacter c ) with 
+            | True -> forcePrint("Match found!!!")
+            | False -> aux*)
 
 module RegEx =
     open System.Text.RegularExpressions
@@ -61,34 +71,50 @@ module State =
     let hand st = st.hand
 
 module Scrabble =
-    open System.Threading
-    open MultiSet
+    open StateMonad
 
-    let getPiece (pieces: Map<uint32, 'a>) (id: uint32) = Map.find id pieces
-
-    let getCharacter (characters: Set<'a>) = 
-        Set.toList characters |> List.head |> fst 
-
-    let bruteForce (hand: MultiSet<uint32>) (pieces: Map<uint32, 'a>) (st: State.state) =
-        //toList hand |> List.head |> getPiece pieces
-        
-        //fold (fun _ x -> if (ScrabbleUtil.Dictionary.lookup (getCharacter x) st.dict) then forcePrint("match found!")) () hand 
-        
-
-        (*let rec aux c = 
-            match ScrabbleUtil.Dictionary.lookup st.dict (getCharacter c ) with 
-            | True -> forcePrint("Match found!!!")
-            | False -> aux*)
+    let getPiece (pieces: Map<uint32, tile>) (id: uint32) = Map.find id pieces
+    let getCharacter (piece: tile) = Set.toList piece |> List.head |> fst
 
 
-    let playGame cstream pieces (st: State.state) =
+    type internal Move = list<((int * int) * (uint32 * (char * int)))>
+    type internal Heuristic = Move -> Move -> bool
+    type internal Algorithm<'a> = Heuristic -> State.state -> Map<uint32, 'a> -> Result<Move, Error>
+    let skip: Move = [ ((1, 1), (uint32 1, ('-', 1))) ]
+
+    let lastWord: Heuristic =
+        fun (move_one: Move) (move_two: Move) -> failwith "Unimplemented"
+
+    let bruteforce: Algorithm<'a> =
+        fun (heuristic: Heuristic) (st: State.state) (pieces: Map<uint32, 'a>) ->
+            let hand = st.hand 
+            MultiSet.fold (fun acc value -> 
+                let currentChar = getCharacter(getPiece value)
+                let filteredMap = Map.filter (fun x -> x <> value) MultiSet.toMap 
+
+            ) skip hand
+         
+
+    let findBestMove
+        (pieces: Map<uint32, 'a>)
+        (st: State.state)
+        (algorithm: Algorithm<'a>)
+        (heuristic: Heuristic)
+        : Result<Move, Error> =
+        algorithm heuristic st pieces
+
+    let findBestMoveOrSkip (pieces: Map<uint32, 'a>) (st: State.state) =
+        match findBestMove pieces st bruteforce lastWord with
+        | Success move -> move
+        | Failure _ -> skip
+
+    let playGame cstream (pieces: Map<uint32, tile>) (st: State.state) =
 
         let rec aux (st: State.state) =
             Print.printHand pieces (State.hand st)
             debugPrint ("\n-------------- DEBUG START -----------------\n")
-
-            let x = bruteForce (State.hand st) pieces
-
+            //let x = bruteForce (State.hand st) pieces
+            let x = getCharacter (getPiece pieces 1u)
             debugPrint (x.ToString())
 
             debugPrint ("\n-------------- DEBUG END -----------------\n")
