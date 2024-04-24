@@ -87,13 +87,29 @@ module Scrabble =
 
     let bruteforce: Algorithm<'a> =
         fun (heuristic: Heuristic) (st: State.state) (pieces: Map<uint32, 'a>) ->
-            let hand = st.hand 
-            MultiSet.fold (fun acc value -> 
-                let currentChar = getCharacter(getPiece value)
-                let filteredMap = Map.filter (fun x -> x <> value) MultiSet.toMap 
+            let hand = st.hand
 
-            ) skip hand
-         
+            MultiSet.fold
+                (fun acc value ->
+                    let currentChar = getCharacter (getPiece pieces value)
+                    let copyHand = MultiSet.removeSingle value hand
+
+                    MultiSet.fold
+                        (fun acc2 value2 ->
+                            let otherChar = getCharacter (getPiece pieces otherChar)
+                            let word = string currentChar + string otherChar
+                            let isWord = Dictionary.lookup word st.dict
+
+                            match isWord with
+                            | true -> acc = []
+                            | false -> acc)
+                        acc
+                        copyHand
+
+                )
+                skip
+                hand
+
 
     let findBestMove
         (pieces: Map<uint32, 'a>)
