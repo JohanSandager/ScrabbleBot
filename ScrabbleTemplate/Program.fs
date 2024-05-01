@@ -49,7 +49,8 @@ let main argv =
         None
 
     // Uncomment this line to call your client
-    // let players    = [("ScrabbleWrappble", ScrabbleWrappble.Scrabble.startGame)]
+    let players = [ ("ScrabbleWrappble", dict, ScrabbleWrappble.Scrabble.startGame) ]
+
     let (dictionary, time) =
         time (fun () -> ScrabbleUtil.Dictionary.mkDict words dictAPI)
 
