@@ -77,6 +77,12 @@ module Scrabble =
     let getCharacter (piece: tile) = Set.toList piece |> List.head |> fst
     let getPointValue (piece: tile) = Set.toList piece |> List.head |> snd
 
+    let getMove pieces id x y =
+        let piece = getPiece pieces id
+        let char = getCharacter piece
+        let pointValue = getPointValue piece
+        [ (coord (x, y), (id, (char, pointValue))) ]
+
     type internal Move = list<((int * int) * (uint32 * (char * int)))>
     type internal Heuristic = Move -> Move -> bool
     type internal Algorithm<'a> = Heuristic -> State.state -> Map<uint32, 'a> -> Result<Move, Error>
@@ -120,7 +126,7 @@ module Scrabble =
         let pointValue = getPointValue tile
         let newWord = (word + (char.ToString()))
 
-        let newMove = List.append move [ (coord (0, (int i)), (id, (char, pointValue))) ]
+        let newMove = List.append move [ hand.[(int i)] ]
 
         match Dictionary.lookup newWord st.dict with
         | true -> newMove
@@ -151,6 +157,13 @@ module Scrabble =
             Print.printHand pieces (State.hand st)
             debugPrint ("\n-------------- DEBUG START -----------------\n")
             let result = wrapTryRec st pieces
+
+            let ourMove =
+                fst (List.fold (fun (lst, a) id -> (List.append (getMove pieces id 0 a) lst, a + 1)) ([], 0) result)
+
+            let newHand = MultiSet.filter (fun key x -> List.contains x result) st.hand
+            debugPrint (newHand.ToString())
+
             debugPrint (result.ToString())
 
             debugPrint ("\n-------------- DEBUG END -----------------\n")
@@ -160,7 +173,7 @@ module Scrabble =
                 "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
 
             let input = System.Console.ReadLine()
-            let move = result
+            let move = ourMove
 
             debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
             send cstream (SMPlay move)
@@ -176,7 +189,7 @@ module Scrabble =
                         st.board
                         st.dict
                         st.playerNumber
-                        (List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty newPieces)
+                        (List.fold (fun acc (x, k) -> MultiSet.add x k acc) newHand newPieces)
 
                 aux st'
             | RCM(CMPlayed(pid, ms, points)) ->

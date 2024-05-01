@@ -29,6 +29,8 @@ let remove (a: 'a) (n: uint32) (R(s)) : MultiSet<'a> =
 let removeSingle (a: 'a) (s: MultiSet<'a>) : MultiSet<'a> = remove a 1u s
 
 let fold (f: 'b -> 'a -> uint32 -> 'b) (acc: 'b) (R(s)) = Map.fold f acc s
+
+let filter (f: 'Key -> 'T -> bool) (R(s)) = R(Map.filter f s)
 let foldBack (f: 'a -> uint32 -> 'b -> 'b) (R(s)) (acc: 'b) = Map.foldBack f s acc
 
 let ofList (lst: 'a list) : MultiSet<'a> =
