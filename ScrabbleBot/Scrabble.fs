@@ -75,7 +75,7 @@ module Scrabble =
 
     let getPiece (pieces: Map<uint32, tile>) (id: uint32) = Map.find id pieces
     let getCharacter (piece: tile) = Set.toList piece |> List.head |> fst
-
+    let getPointValue (piece: tile) = Set.toList piece |> List.head |> snd
 
     type internal Move = list<((int * int) * (uint32 * (char * int)))>
     type internal Heuristic = Move -> Move -> bool
@@ -112,9 +112,24 @@ module Scrabble =
 
             Success bestMove*)
 
-    let bruteforce: Algorithm<'a> =
-        fun (heuristic: Heuristic) (st: State.state) (pieces: Map<uint32, 'a>) ->
-        
+    let rec tryRec (st: State.state) (word: string) (pieces: Map<uint32, 'a>) (i: uint32) (move) =
+        let hand = MultiSet.toList st.hand
+        let id = hand.[(int i)]
+        let tile = getPiece pieces id
+        let char = getCharacter tile
+        let pointValue = getPointValue tile
+        let newWord = (word + (char.ToString()))
+
+        let newMove = List.append move [ (coord (0, (int i)), (id, (char, pointValue))) ]
+
+        match Dictionary.lookup newWord st.dict with
+        | true -> newMove
+        | false -> tryRec st newWord pieces (i + 1u) newMove
+
+    let wrapTryRec (st: State.state) (pieces: Map<uint32, 'a>) =
+        let hand = MultiSet.toList st.hand
+
+        tryRec st "" pieces 0u []
 
 
     let findBestMove
@@ -125,18 +140,18 @@ module Scrabble =
         : Result<Move, Error> =
         algorithm heuristic st pieces
 
-    let findBestMoveOrSkip (pieces: Map<uint32, 'a>) (st: State.state) =
+    (*let findBestMoveOrSkip (pieces: Map<uint32, 'a>) (st: State.state) =
         match findBestMove pieces st bruteforce lastWord with
         | Success move -> move
-        | Failure _ -> skip
+        | Failure _ -> skip*)
 
     let playGame cstream (pieces: Map<uint32, tile>) (st: State.state) =
 
         let rec aux (st: State.state) =
             Print.printHand pieces (State.hand st)
             debugPrint ("\n-------------- DEBUG START -----------------\n")
-            let res = findBestMoveOrSkip pieces st
-            debugPrint (res.ToString())
+            let result = wrapTryRec st pieces
+            debugPrint (result.ToString())
 
             debugPrint ("\n-------------- DEBUG END -----------------\n")
 
@@ -145,7 +160,7 @@ module Scrabble =
                 "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
 
             let input = System.Console.ReadLine()
-            let move = RegEx.parseMove input
+            let move = result
 
             debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
             send cstream (SMPlay move)
@@ -156,7 +171,13 @@ module Scrabble =
             match msg with
             | RCM(CMPlaySuccess(ms, points, newPieces)) ->
                 (* Successful play by you. Update your state (remove old tiles, add the new ones, change turn, etc) *)
-                let st' = st // This state needs to be updated
+                let st' =
+                    State.mkState
+                        st.board
+                        st.dict
+                        st.playerNumber
+                        (List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty newPieces)
+
                 aux st'
             | RCM(CMPlayed(pid, ms, points)) ->
                 (* Successful play by other player. Update your state *)
