@@ -85,30 +85,36 @@ module Scrabble =
     let lastWord: Heuristic =
         fun (move_one: Move) (move_two: Move) -> failwith "Unimplemented"
 
+    (*let bruteforce: Algorithm<'a> =
+        fun (heuristic: Heuristic) (st: State.state) (pieces: Map<uint32, 'a>) ->
+            let hand = MultiSet.toList st.hand
+            let bestMove = skip
+            let wordList = []
+
+            for i in 0 .. hand.Length do
+                let tile = getPiece pieces hand.[i]
+                let char = getCharacter tile
+                let tempHand = List.removeAt i hand
+
+                for j in 0 .. tempHand.Length do
+                    let tile2 = getPiece pieces hand.[j]
+                    let char2 = getCharacter tile2
+                    let tempHand2 = List.removeAt j hand
+
+                    for k in 0 .. tempHand2.Length do
+                        let tile3 = getPiece pieces hand.[k]
+                        let char3 = getCharacter tile3
+                        let word = char.ToString() + char2.ToString() + char3.ToString()
+                        let isWord = Dictionary.lookup word st.dict
+
+                        if isWord then 
+                            
+
+            Success bestMove*)
+
     let bruteforce: Algorithm<'a> =
         fun (heuristic: Heuristic) (st: State.state) (pieces: Map<uint32, 'a>) ->
-            let hand = st.hand
-
-            MultiSet.fold
-                (fun acc value ->
-                    let currentChar = getCharacter (getPiece pieces value)
-                    let copyHand = MultiSet.removeSingle value hand
-
-                    MultiSet.fold
-                        (fun acc2 value2 ->
-                            let otherChar = getCharacter (getPiece pieces otherChar)
-                            let word = string currentChar + string otherChar
-                            let isWord = Dictionary.lookup word st.dict
-
-                            match isWord with
-                            | true -> acc = []
-                            | false -> acc)
-                        acc
-                        copyHand
-
-                )
-                skip
-                hand
+        
 
 
     let findBestMove
@@ -129,9 +135,8 @@ module Scrabble =
         let rec aux (st: State.state) =
             Print.printHand pieces (State.hand st)
             debugPrint ("\n-------------- DEBUG START -----------------\n")
-            //let x = bruteForce (State.hand st) pieces
-            let x = getCharacter (getPiece pieces 1u)
-            debugPrint (x.ToString())
+            let res = findBestMoveOrSkip pieces st
+            debugPrint (res.ToString())
 
             debugPrint ("\n-------------- DEBUG END -----------------\n")
 
