@@ -118,24 +118,32 @@ module Scrabble =
 
             Success bestMove*)
 
-    let rec tryRec (st: State.state) (word: string) (pieces: Map<uint32, 'a>) (i: uint32) (move) =
+    let rec tryRec (st: State.state) (word: string) (pieces: Map<uint32, tile>) (i: uint32) (move) =
         let hand = MultiSet.toList st.hand
         let id = hand.[(int i)]
         let tile = getPiece pieces id
         let char = getCharacter tile
-        let pointValue = getPointValue tile
         let newWord = (word + (char.ToString()))
 
         let newMove = List.append move [ hand.[(int i)] ]
 
         match Dictionary.lookup newWord st.dict with
         | true -> newMove
-        | false -> tryRec st newWord pieces (i + 1u) newMove
+        | false ->
+            match i with
+            | i when (int i) < hand.Length - 1 -> tryRec st newWord pieces (i + 1u) newMove
+            | _ -> []
 
-    let wrapTryRec (st: State.state) (pieces: Map<uint32, 'a>) =
+    let rec wrapTryRec (st: State.state) (pieces: Map<uint32, tile>) (index) =
         let hand = MultiSet.toList st.hand
+        let result = tryRec st "" pieces index []
 
-        tryRec st "" pieces 0u []
+        match result with
+        | [] ->
+            match index with
+            | index when (int index) < hand.Length - 1 -> wrapTryRec st pieces (index + 1u)
+            | _ -> []
+        | _ -> result
 
 
     let findBestMove
@@ -151,17 +159,22 @@ module Scrabble =
         | Success move -> move
         | Failure _ -> skip*)
 
+    let rec tempRem lst mtst =
+        match lst with
+        | x :: xs -> tempRem xs (MultiSet.removeSingle x mtst)
+        | [] -> mtst
+
     let playGame cstream (pieces: Map<uint32, tile>) (st: State.state) =
 
         let rec aux (st: State.state) =
             Print.printHand pieces (State.hand st)
             debugPrint ("\n-------------- DEBUG START -----------------\n")
-            let result = wrapTryRec st pieces
+            let result = wrapTryRec st pieces 0u
 
             let ourMove =
                 fst (List.fold (fun (lst, a) id -> (List.append (getMove pieces id 0 a) lst, a + 1)) ([], 0) result)
 
-            let newHand = MultiSet.filter (fun key x -> List.contains x result) st.hand
+            let newHand = tempRem result st.hand
             debugPrint (newHand.ToString())
 
             debugPrint (result.ToString())
@@ -172,11 +185,14 @@ module Scrabble =
             forcePrint
                 "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
 
-            let input = System.Console.ReadLine()
-            let move = ourMove
+            // let input = System.Console.ReadLine()
+            let move =
+                match ourMove with
+                | [] -> SMPass
+                | _ -> SMPlay ourMove
 
             debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
-            send cstream (SMPlay move)
+            send cstream (move)
 
             let msg = recv cstream
             debugPrint (sprintf "Player %d <- Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
