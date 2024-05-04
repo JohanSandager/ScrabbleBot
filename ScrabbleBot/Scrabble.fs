@@ -55,20 +55,25 @@ module State =
 
     type state =
         { board: Parser.board
-          dict: ScrabbleUtil.Dictionary.Dict
+          ourBoard: Map<coord, uint32>
+          dict: Dictionary.Dict
           playerNumber: uint32
-          hand: MultiSet.MultiSet<uint32> }
+          hand: MultiSet.MultiSet<uint32>
+          lastPlayed: coord }
 
-    let mkState b d pn h =
+    let mkState b d pn h oB lP =
         { board = b
+          ourBoard = oB
           dict = d
           playerNumber = pn
-          hand = h }
+          hand = h
+          lastPlayed = lP }
 
     let board st = st.board
     let dict st = st.dict
     let playerNumber st = st.playerNumber
     let hand st = st.hand
+    let ourBoard st = st.ourBoard
 
 module Scrabble =
     open StateMonad
@@ -84,80 +89,90 @@ module Scrabble =
         [ (coord (x, y), (id, (char, pointValue))) ]
 
     type internal Move = list<((int * int) * (uint32 * (char * int)))>
-    type internal Heuristic = Move -> Move -> bool
-    type internal Algorithm<'a> = Heuristic -> State.state -> Map<uint32, 'a> -> Result<Move, Error>
     let skip: Move = [ ((1, 1), (uint32 1, ('-', 1))) ]
 
-    let lastWord: Heuristic =
-        fun (move_one: Move) (move_two: Move) -> failwith "Unimplemented"
-
-    (*let bruteforce: Algorithm<'a> =
-        fun (heuristic: Heuristic) (st: State.state) (pieces: Map<uint32, 'a>) ->
-            let hand = MultiSet.toList st.hand
-            let bestMove = skip
-            let wordList = []
-
-            for i in 0 .. hand.Length do
-                let tile = getPiece pieces hand.[i]
-                let char = getCharacter tile
-                let tempHand = List.removeAt i hand
-
-                for j in 0 .. tempHand.Length do
-                    let tile2 = getPiece pieces hand.[j]
-                    let char2 = getCharacter tile2
-                    let tempHand2 = List.removeAt j hand
-
-                    for k in 0 .. tempHand2.Length do
-                        let tile3 = getPiece pieces hand.[k]
-                        let char3 = getCharacter tile3
-                        let word = char.ToString() + char2.ToString() + char3.ToString()
-                        let isWord = Dictionary.lookup word st.dict
-
-                        if isWord then 
-                            
-
-            Success bestMove*)
-
-    let rec tryRec (st: State.state) (word: string) (pieces: Map<uint32, tile>) (i: uint32) (move) =
-        let hand = MultiSet.toList st.hand
+    /// Recursively tries to build a combination of consecutive letters in the hand that match a word, returns an empty list if no word was found.
+    let rec tryFindConecutiveCombination
+        (hand: uint32 list)
+        (pieces: Map<uint32, tile>)
+        (i: uint32)
+        (move)
+        (dict)
+        (word)
+        =
         let id = hand.[(int i)]
         let tile = getPiece pieces id
         let char = getCharacter tile
+        let newMove = List.append move [ hand.[(int i)] ]
         let newWord = (word + (char.ToString()))
 
-        let newMove = List.append move [ hand.[(int i)] ]
+        debugPrint ("Trying: " + newWord + "\n")
+        debugPrint ("Hand: " + hand.ToString() + "\n")
 
-        match Dictionary.lookup newWord st.dict with
-        | true -> newMove
-        | false ->
+        match Dictionary.step char dict with
+        | Some(true, _) ->
+            debugPrint ("Word found " + newWord + "\n")
+            newMove
+        | Some(false, dict) ->
+            debugPrint ("Nothing found for char " + (char.ToString()) + "\n")
+
             match i with
-            | i when (int i) < hand.Length - 1 -> tryRec st newWord pieces (i + 1u) newMove
-            | _ -> []
+            | i when (int i) < hand.Length - 1 ->
+                debugPrint "Doing this... \n"
+                tryFindConecutiveCombination hand pieces (i + 1u) newMove dict newWord
+            | _ ->
+                debugPrint "Returning... \n"
+                []
+        | None ->
+            debugPrint "No word down this path... \n"
+            []
 
-    let rec wrapTryRec (st: State.state) (pieces: Map<uint32, tile>) (index) =
-        let hand = MultiSet.toList st.hand
-        let result = tryRec st "" pieces index []
+    let rec stepOverList (lst: uint32 list) dict pieces =
+        // debugPrint (lst.ToString() + "<- List should look like this \n")
+
+        match lst with
+        | x :: xs ->
+            let char = getCharacter (getPiece pieces x)
+            // debugPrint ("Stepping over: " + char.ToString() + "\n")
+            let step = Dictionary.step char dict
+
+            match step with
+            | Some(true, newDict) ->
+                // debugPrint "Found word \n"
+                stepOverList xs newDict pieces
+            | Some(false, newDict) ->
+                // debugPrint "No word here, moving on... \n"
+                stepOverList xs newDict pieces
+            | None -> dict
+        | [] ->
+            // debugPrint "Done returning dict... \n"
+            dict
+
+    /// Recursively loops over every tile in the hand returning an empty list if no move was found, or a list of uint32 ids mapping to placable tiles.
+    let rec loopOverHand (st: State.state) (pieces: Map<uint32, tile>) (index) =
+        let alreadInBoard = Map.fold (fun acc _ id -> List.append [ id ] acc) [] st.ourBoard
+        debugPrint ("Already in board: " + alreadInBoard.ToString() + "\n")
+        let stepOverDict = stepOverList (List.rev alreadInBoard) st.dict pieces
+        let hand = List.append alreadInBoard (MultiSet.toList st.hand)
+        let result = tryFindConecutiveCombination hand pieces index [] stepOverDict ""
 
         match result with
         | [] ->
             match index with
-            | index when (int index) < hand.Length - 1 -> wrapTryRec st pieces (index + 1u)
+            | index when (int index) < hand.Length - 1 -> loopOverHand st pieces (index + 1u)
             | _ -> []
         | _ -> result
 
+    let getPlayableMove pieces movesLst centerPos =
+        let x, y = centerPos
 
-    let findBestMove
-        (pieces: Map<uint32, 'a>)
-        (st: State.state)
-        (algorithm: Algorithm<'a>)
-        (heuristic: Heuristic)
-        : Result<Move, Error> =
-        algorithm heuristic st pieces
+        let aux =
+            fst (List.fold (fun (lst, a) id -> (List.append (getMove pieces id x a) lst, a + 1)) ([], y) movesLst)
 
-    (*let findBestMoveOrSkip (pieces: Map<uint32, 'a>) (st: State.state) =
-        match findBestMove pieces st bruteforce lastWord with
-        | Success move -> move
-        | Failure _ -> skip*)
+        match aux with
+        | [] -> SMPass
+        | _ -> SMPlay aux
+
 
     let rec tempRem lst mtst =
         match lst with
@@ -168,14 +183,12 @@ module Scrabble =
 
         let rec aux (st: State.state) =
             Print.printHand pieces (State.hand st)
-            debugPrint ("\n-------------- DEBUG START -----------------\n")
-            let result = wrapTryRec st pieces 0u
+            let result = loopOverHand st pieces 0u
 
-            let ourMove =
-                fst (List.fold (fun (lst, a) id -> (List.append (getMove pieces id 0 a) lst, a + 1)) ([], 0) result)
+            let ourMove = getPlayableMove pieces result st.lastPlayed
 
             let newHand = tempRem result st.hand
-            debugPrint (newHand.ToString())
+            debugPrint ("\n-------------- DEBUG START -----------------\n")
 
             debugPrint (result.ToString())
 
@@ -185,28 +198,30 @@ module Scrabble =
             forcePrint
                 "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
 
-            // let input = System.Console.ReadLine()
-            let move =
-                match ourMove with
-                | [] -> SMPass
-                | _ -> SMPlay ourMove
+            let input = System.Console.ReadLine()
 
-            debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
-            send cstream (move)
+            debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) ourMove) // keep the debug lines. They are useful.
+            send cstream (ourMove)
 
             let msg = recv cstream
-            debugPrint (sprintf "Player %d <- Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
+            debugPrint (sprintf "Player %d <- Server:\n%A\n" (State.playerNumber st) ourMove) // keep the debug lines. They are useful.
 
             match msg with
             | RCM(CMPlaySuccess(ms, points, newPieces)) ->
                 (* Successful play by you. Update your state (remove old tiles, add the new ones, change turn, etc) *)
+                let newMap =
+                    List.fold (fun acc x -> Map.add (fst x) (fst (snd x)) acc) st.ourBoard ms
+
                 let st' =
                     State.mkState
                         st.board
                         st.dict
                         st.playerNumber
                         (List.fold (fun acc (x, k) -> MultiSet.add x k acc) newHand newPieces)
+                        newMap
+                        (fst ms.[ms.Length - 1])
 
+                debugPrint (newMap.ToString())
                 aux st'
             | RCM(CMPlayed(pid, ms, points)) ->
                 (* Successful play by other player. Update your state *)
@@ -257,4 +272,4 @@ module Scrabble =
 
         let handSet = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty hand
 
-        fun () -> playGame cstream tiles (State.mkState board dict playerNumber handSet)
+        fun () -> playGame cstream tiles (State.mkState board dict playerNumber handSet Map.empty board.center)
