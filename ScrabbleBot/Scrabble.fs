@@ -280,7 +280,7 @@ module Scrabble =
                         st.playerNumber
                         (List.fold (fun acc (x, k) -> MultiSet.add x k acc) newHand newPieces)
                         newMap
-                        (fst ms.[0])
+                        (fst (fst ms.[0]), (snd (fst ms.[0])) + 1)
 
                 debugPrint (newMap.ToString())
                 aux st'

@@ -13,13 +13,15 @@ let rec insert (str: string) (dict: Dict) =
     | Leaf b -> Node(b, Map.add str.[0] (insert str.[1..] (Leaf false)) Map.empty)
     | Node(b, r) ->
         let nextDict =
-            match Map.tryFind str.[0] r with
-            | Some next -> next
-            | None -> Leaf false
+            match r.TryGetValue str.[0] with
+            | (true, next) -> next
+            | (false, _) -> Leaf false
 
         Node(b, Map.add str.[0] (insert str.[1..] nextDict) r)
 
 let rec lookup (str: string) (dict: Dict) =
+    //ScrabbleUtil.DebugPrint.debugPrint ("Hey I am called, bruv.")
+
     match dict with
     | Leaf b when str.Length = 0 -> b
     | Leaf _ -> false
@@ -29,5 +31,12 @@ let rec lookup (str: string) (dict: Dict) =
         | (true, next) -> lookup str.[1..] next
         | (false, _) -> false
 
-let step (char: char) (dict: Dict) = Some(false, dict)
-//Lukas was here :)
+let step (char: char) (dict: Dict) =
+    //ScrabbleUtil.DebugPrint.debugPrint ("Hey I am called from ze step, bruv.")
+
+    match dict with
+    | Leaf _ -> None
+    | Node(b, r) ->
+        match r.TryFind char with
+        | Some v -> Some(b, v)
+        | None -> None

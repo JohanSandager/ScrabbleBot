@@ -52,8 +52,8 @@ let main argv =
 
     let ourDict = ScrabbleUtil.Dictionary.mkDict words dictAPI false
 
-    let incorrectWords = ScrabbleUtil.Dictionary.test words 10 ourDict
-    ScrabbleUtil.DebugPrint.debugPrint (incorrectWords.ToString())
+    //let incorrectWords = ScrabbleUtil.Dictionary.test words 10 ourDict
+    //ScrabbleUtil.DebugPrint.debugPrint (incorrectWords.ToString())
 
     // Uncomment this line to call your client
 
