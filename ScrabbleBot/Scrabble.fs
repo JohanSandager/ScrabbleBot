@@ -7,18 +7,6 @@ open System.IO
 
 open ScrabbleUtil.DebugPrint
 
-// The RegEx module is only used to parse human input. It is not used for the final product.
-// let bruteForce (hand: MultiSet<uint32>) (pieces: Map<uint32, 'a>) (st: State.state) =
-//toList hand |> List.head |> getPiece pieces
-
-//fold (fun _ x -> if (ScrabbleUtil.Dictionary.lookup (getCharacter x) st.dict) then forcePrint("match found!")) () hand
-
-
-(*let rec aux c = 
-            match ScrabbleUtil.Dictionary.lookup st.dict (getCharacter c ) with 
-            | True -> forcePrint("Match found!!!")
-            | False -> aux*)
-
 module RegEx =
     open System.Text.RegularExpressions
 
@@ -130,31 +118,31 @@ module Scrabble =
         let newWord = (word + (char.ToString()))
         let dictToUseTemp = stepOverList stepOver dict pieces
 
-        debugPrint ("Trying: " + newWord + "\n")
+        // debugPrint ("Trying: " + newWord + "\n")
         // debugPrint ("Hand: " + hand.ToString() + "\n")
 
         match Dictionary.step char dictToUseTemp with
         | Some(true, _) ->
-            debugPrint ("Word found " + newWord + "\n")
+            // debugPrint ("Word found " + newWord + "\n")
             newMove
         | Some(false, newDict) ->
-            debugPrint ("Nothing found for char " + (char.ToString()) + "\n")
+            // debugPrint ("Nothing found for char " + (char.ToString()) + "\n")
 
             match i with
             | i when (int i) < hand.Length - 1 ->
-                debugPrint "Doing this... \n"
+                // debugPrint "Doing this... \n"
                 tryFindConsecutiveCombination hand pieces (i + 1u) newMove newDict newWord stepOver
             | _ ->
-                debugPrint "Returning... \n"
+                // debugPrint "Returning... \n"
                 []
         | None ->
-            debugPrint "No word down this path... \n"
+            // debugPrint "No word down this path... \n"
             []
 
     /// Recursively loops over every tile in the hand returning an empty list if no move was found, or a list of uint32 ids mapping to placable tiles.
     let rec loopOverHand (st: State.state) (pieces: Map<uint32, tile>) (index) =
         let alreadInBoard = Map.fold (fun acc _ id -> List.append [ id ] acc) [] st.ourBoard
-        debugPrint ("Already in board: " + alreadInBoard.ToString() + "\n")
+        // debugPrint ("Already in board: " + alreadInBoard.ToString() + "\n")
         let stepOverDict = stepOverList (List.rev alreadInBoard) st.dict pieces
         let hand = MultiSet.toList st.hand
 
@@ -221,6 +209,45 @@ module Scrabble =
 
             let newHand = tempRem result st.hand
             debugPrint ("\n-------------- DEBUG START -----------------\n")
+
+            let testDic1 =
+                match (Dictionary.step 'B' st.dict) with
+                | Some(false, newDict) -> newDict
+
+            let testDic2 =
+                match (Dictionary.step 'E' testDic1) with
+                | Some(false, newDict) -> newDict
+
+            let testDic3 =
+                match (Dictionary.step 'N' testDic2) with
+                | Some(true, newDict) ->
+                    debugPrint ("Yayy")
+                    newDict
+
+            let testDic4 =
+                match (Dictionary.step 'N' testDic3) with
+                | Some(true, newDict) ->
+                    debugPrint "It is a word... \n"
+                    newDict
+                | Some(false, newDict) ->
+                    debugPrint "WTF \n"
+                    newDict
+                | None ->
+                    debugPrint "I don't even know no more... \n"
+                    st.dict
+
+            let testDic5 =
+                match (Dictionary.step 'E' testDic4) with
+                | Some(true, newDict) ->
+                    debugPrint "It is a word... \n"
+                    newDict
+                | Some(false, newDict) ->
+                    debugPrint "WTF \n"
+                    newDict
+                | None ->
+                    debugPrint "I don't even know no more... \n"
+                    st.dict
+
 
             debugPrint (result.ToString())
 
