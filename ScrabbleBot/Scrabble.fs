@@ -55,7 +55,7 @@ module State =
 
     type state =
         { board: Parser.board
-          ourBoard: Map<coord, uint32>
+          ourBoard: Map<coord, uint32> // Coordinate to tile id
           dict: Dictionary.Dict
           playerNumber: uint32
           hand: MultiSet.MultiSet<uint32>
@@ -78,9 +78,31 @@ module State =
 module Scrabble =
     open StateMonad
 
+
     let getPiece (pieces: Map<uint32, tile>) (id: uint32) = Map.find id pieces
     let getCharacter (piece: tile) = Set.toList piece |> List.head |> fst
     let getPointValue (piece: tile) = Set.toList piece |> List.head |> snd
+
+    let rec stepOverList (lst: uint32 list) dict pieces =
+        // debugPrint (lst.ToString() + "<- List should look like this \n")
+
+        match lst with
+        | x :: xs ->
+            let char = getCharacter (getPiece pieces x)
+            debugPrint ("Stepping over: " + char.ToString() + "\n")
+            let step = Dictionary.step char dict
+
+            match step with
+            | Some(true, newDict) ->
+                debugPrint "Found word \n"
+                stepOverList xs newDict pieces
+            | Some(false, newDict) ->
+                debugPrint "No word here, moving on... \n"
+                stepOverList xs newDict pieces
+            | None -> dict
+        | [] ->
+            debugPrint "Done returning dict... \n"
+            dict
 
     let getMove pieces id x y =
         let piece = getPiece pieces id
@@ -99,27 +121,29 @@ module Scrabble =
         (move)
         (dict)
         (word)
+        (stepOver)
         =
         let id = hand.[(int i)]
         let tile = getPiece pieces id
         let char = getCharacter tile
         let newMove = List.append move [ hand.[(int i)] ]
         let newWord = (word + (char.ToString()))
+        let dictToUseTemp = stepOverList stepOver dict pieces
 
         debugPrint ("Trying: " + newWord + "\n")
-        debugPrint ("Hand: " + hand.ToString() + "\n")
+        // debugPrint ("Hand: " + hand.ToString() + "\n")
 
-        match Dictionary.step char dict with
+        match Dictionary.step char dictToUseTemp with
         | Some(true, _) ->
             debugPrint ("Word found " + newWord + "\n")
             newMove
-        | Some(false, dict) ->
+        | Some(false, newDict) ->
             debugPrint ("Nothing found for char " + (char.ToString()) + "\n")
 
             match i with
             | i when (int i) < hand.Length - 1 ->
                 debugPrint "Doing this... \n"
-                tryFindConecutiveCombination hand pieces (i + 1u) newMove dict newWord
+                tryFindConecutiveCombination hand pieces (i + 1u) newMove newDict newWord stepOver
             | _ ->
                 debugPrint "Returning... \n"
                 []
@@ -127,34 +151,15 @@ module Scrabble =
             debugPrint "No word down this path... \n"
             []
 
-    let rec stepOverList (lst: uint32 list) dict pieces =
-        // debugPrint (lst.ToString() + "<- List should look like this \n")
-
-        match lst with
-        | x :: xs ->
-            let char = getCharacter (getPiece pieces x)
-            // debugPrint ("Stepping over: " + char.ToString() + "\n")
-            let step = Dictionary.step char dict
-
-            match step with
-            | Some(true, newDict) ->
-                // debugPrint "Found word \n"
-                stepOverList xs newDict pieces
-            | Some(false, newDict) ->
-                // debugPrint "No word here, moving on... \n"
-                stepOverList xs newDict pieces
-            | None -> dict
-        | [] ->
-            // debugPrint "Done returning dict... \n"
-            dict
-
     /// Recursively loops over every tile in the hand returning an empty list if no move was found, or a list of uint32 ids mapping to placable tiles.
     let rec loopOverHand (st: State.state) (pieces: Map<uint32, tile>) (index) =
         let alreadInBoard = Map.fold (fun acc _ id -> List.append [ id ] acc) [] st.ourBoard
         debugPrint ("Already in board: " + alreadInBoard.ToString() + "\n")
         let stepOverDict = stepOverList (List.rev alreadInBoard) st.dict pieces
-        let hand = List.append alreadInBoard (MultiSet.toList st.hand)
-        let result = tryFindConecutiveCombination hand pieces index [] stepOverDict ""
+        let hand = MultiSet.toList st.hand
+
+        let result =
+            tryFindConecutiveCombination hand pieces index [] stepOverDict "" (List.rev alreadInBoard)
 
         match result with
         | [] ->
@@ -162,6 +167,33 @@ module Scrabble =
             | index when (int index) < hand.Length - 1 -> loopOverHand st pieces (index + 1u)
             | _ -> []
         | _ -> result
+
+    (*
+            WORK IN PROGRESS
+    type Direction =
+        | Up
+        | Down
+        | Left
+        | Right
+
+    let coordHasPlacedTile (coord: coord) (placedTiles: Map<coord, uint32>) =
+        let result = placedTiles.TryFind coord
+
+        match result with
+        | Some _ -> true
+        | None -> false
+
+    let rec walker (currentCoord: coord) placedTiles (direction: Direction) =
+        let (x, y) = currentCoord
+
+        match direction with
+        | Up ->
+            match coordHasPlacedTile (x, y + 1) placedTiles with
+            | true -> walker (x, y + 1) placedTiles
+            | false -> tryFindConecutiveCombination
+        | Down -> coordHasPlacedTile (x, y - 1) placedTiles
+        | Left -> coordHasPlacedTile (x - 1, y) placedTiles
+        | Right -> coordHasPlacedTile (x + 1, y) placedTiles*)
 
     let getPlayableMove pieces movesLst centerPos =
         let x, y = centerPos
@@ -212,6 +244,8 @@ module Scrabble =
                 let newMap =
                     List.fold (fun acc x -> Map.add (fst x) (fst (snd x)) acc) st.ourBoard ms
 
+                debugPrint ((fst ms.[0]).ToString())
+
                 let st' =
                     State.mkState
                         st.board
@@ -219,7 +253,7 @@ module Scrabble =
                         st.playerNumber
                         (List.fold (fun acc (x, k) -> MultiSet.add x k acc) newHand newPieces)
                         newMap
-                        (fst ms.[ms.Length - 1])
+                        (fst ms.[0])
 
                 debugPrint (newMap.ToString())
                 aux st'
