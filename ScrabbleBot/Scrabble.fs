@@ -114,7 +114,7 @@ module Scrabble =
     let skip: Move = [ ((1, 1), (uint32 1, ('-', 1))) ]
 
     /// Recursively tries to build a combination of consecutive letters in the hand that match a word, returns an empty list if no word was found.
-    let rec tryFindConecutiveCombination
+    let rec tryFindConsecutiveCombination
         (hand: uint32 list)
         (pieces: Map<uint32, tile>)
         (i: uint32)
@@ -143,7 +143,7 @@ module Scrabble =
             match i with
             | i when (int i) < hand.Length - 1 ->
                 debugPrint "Doing this... \n"
-                tryFindConecutiveCombination hand pieces (i + 1u) newMove newDict newWord stepOver
+                tryFindConsecutiveCombination hand pieces (i + 1u) newMove newDict newWord stepOver
             | _ ->
                 debugPrint "Returning... \n"
                 []
@@ -159,7 +159,7 @@ module Scrabble =
         let hand = MultiSet.toList st.hand
 
         let result =
-            tryFindConecutiveCombination hand pieces index [] stepOverDict "" (List.rev alreadInBoard)
+            tryFindConsecutiveCombination hand pieces index [] stepOverDict "" (List.rev alreadInBoard)
 
         match result with
         | [] ->
