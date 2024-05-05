@@ -2,6 +2,7 @@
 
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
+open AwesomeBoard
 
 open System.IO
 
@@ -156,32 +157,31 @@ module Scrabble =
             | _ -> []
         | _ -> result
 
+
     (*
-            WORK IN PROGRESS
-    type Direction =
-        | Up
-        | Down
-        | Left
-        | Right
-
-    let coordHasPlacedTile (coord: coord) (placedTiles: Map<coord, uint32>) =
-        let result = placedTiles.TryFind coord
-
-        match result with
-        | Some _ -> true
-        | None -> false
-
-    let rec walker (currentCoord: coord) placedTiles (direction: Direction) =
+    let rec walker
+        (currentCoord: coord)
+        placedTiles
+        (direction: Direction)
+        (trail: uint32 List)
+        (hand: uint32 list)
+        (pieces: Map<uint32, tile>)
+        (i: uint32)
+        (move)
+        (dict)
+        (word)
+        =
         let (x, y) = currentCoord
 
         match direction with
         | Up ->
-            match coordHasPlacedTile (x, y + 1) placedTiles with
-            | true -> walker (x, y + 1) placedTiles
-            | false -> tryFindConecutiveCombination
+            match tryGetTileFromCoordinate (x, y + 1) placedTiles with
+            | Some v -> walker (x, y + 1) placedTiles (trail :: v)
+            | None -> tryFindConsecutiveCombination hand
         | Down -> coordHasPlacedTile (x, y - 1) placedTiles
         | Left -> coordHasPlacedTile (x - 1, y) placedTiles
-        | Right -> coordHasPlacedTile (x + 1, y) placedTiles*)
+        | Right -> coordHasPlacedTile (x + 1, y) placedTiles
+        *)
 
     let getPlayableMove pieces movesLst centerPos =
         let x, y = centerPos
