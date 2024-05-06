@@ -150,14 +150,14 @@ module Scrabble =
 
     let rec loopOverHand2 (st: State.state) (pieces: Map<uint32, tile>) (index) (stepOver) =
         debugPrint ("loopOverHand stepover : " + stepOver.ToString() + "\n")
-        let stepOverDict = stepOverList stepOver st.dict pieces
+        //let stepOverDict = stepOverList stepOver st.dict pieces
         let hand = toList st.hand
 
         let word =
             List.fold (fun acc c -> (getCharacter (getPiece pieces c)).ToString() + acc) "" stepOver
 
         let result =
-            tryFindConsecutiveCombination st.hand pieces index [] stepOverDict word stepOver
+            tryFindConsecutiveCombination st.hand pieces index [] st.dict word stepOver
 
         match result with
         | [] ->
@@ -196,7 +196,7 @@ module Scrabble =
                     | None -> trail
 
                 match loopOverHand2 st pieces 0u tempTrail with
-                | [] -> walker st (x + 1, y) Right [ (getTileFromCoordinate currentCoord st.awesomeBoard) ] pieces word
+                | [] -> walker st (x, y) Right [] pieces word
                 | lst -> ((x, y), Down, lst)
         | Right ->
             debugPrint ("Im going right, current coord: " + (x, y).ToString() + " \n")
@@ -222,7 +222,9 @@ module Scrabble =
                     | None -> trail
 
                 match loopOverHand2 st pieces 0u tempTrail with
-                | [] -> ((x, y), Right, [])
+                | [] ->
+                    debugPrint ("It's going down foreal \n")
+                    walker st (x, y) Down [] pieces word
                 | lst -> ((x, y), Right, lst)
 
     let getPlayableMove (direction: Direction) pieces movesLst fromPos (st: State.state) =
@@ -260,7 +262,7 @@ module Scrabble =
                         movesLst)
                 | false ->
                     (List.fold
-                        (fun (lst, a, b) id -> ((List.append (getMove pieces id a b) lst), a + 1, b + 1))
+                        (fun (lst, a, b) id -> ((List.append (getMove pieces id a b) lst), a + 1, b))
                         ([], x + 1, y)
                         movesLst)
 
