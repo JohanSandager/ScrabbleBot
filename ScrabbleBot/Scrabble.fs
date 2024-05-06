@@ -111,78 +111,74 @@ module Scrabble =
         (dict)
         (word)
         (stepOver)
+        (reverse: bool)
         =
+        let correctStepOver =
+            match reverse with
+            | true -> List.rev stepOver
+            | false -> stepOver
+
         let hand = MultiSet.toList handMultiset
         let id = hand.[(int i)]
         let tile = getPiece pieces id
         let char = getCharacter tile
         let newMove = List.append move [ hand.[(int i)] ]
         let newWord = (word + (char.ToString()))
-        let dictToUseTemp = stepOverList stepOver dict pieces
+        let dictToUseTemp = stepOverList correctStepOver dict pieces
 
-        //debugPrint ("Trying: " + newWord + "\n")
-        //ÆdebugPrint ("Hand: " + hand.ToString() + "\n")
+        debugPrint ("Trying: " + newWord + "\n")
+        //debugPrint ("Hand: " + hand.ToString() + "\n")
 
         match Dictionary.step char dictToUseTemp with
         | Some(true, _) ->
-            //debugPrint ("Word found " + newWord + "\n")
+            debugPrint ("Word found " + newWord + "\n")
             newMove
         | Some(false, newDict) ->
-            //debugPrint ("Nothing found for char " + (char.ToString()) + "\n")
+            debugPrint ("Nothing found for char " + (char.ToString()) + "\n")
 
             match i with
             | i when (int i) < hand.Length - 1 ->
-                //debugPrint "Doing this... \n"
-                tryFindConsecutiveCombination handMultiset pieces (i + 1u) newMove newDict newWord stepOver
+                debugPrint "Doing this... \n"
+                tryFindConsecutiveCombination handMultiset pieces (i + 1u) newMove newDict newWord stepOver reverse
             | _ ->
-                //debugPrint "Returning... \n"
+                debugPrint "Returning... \n"
                 []
         | None ->
-            //debugPrint "No word down this path... \n"
+            debugPrint "No word down this path... \n"
             []
 
-    /// Recursively loops over every tile in the hand returning an empty list if no move was found, or a list of uint32 ids mapping to placable tiles.
-    let rec loopOverHand (st: State.state) (pieces: Map<uint32, tile>) (index) =
-        let alreadInBoard =
-            Map.fold (fun acc _ id -> List.append [ id ] acc) [] st.awesomeBoard
-
-        debugPrint ("Already in board: " + alreadInBoard.ToString() + "\n")
-        let stepOverDict = stepOverList (List.rev alreadInBoard) st.dict pieces
-        let hand = MultiSet.toList st.hand
-
-        let result =
-            tryFindConsecutiveCombination st.hand pieces index [] stepOverDict "" (List.rev alreadInBoard)
-
-        match result with
-        | [] ->
-            match index with
-            | index when (int index) < hand.Length - 1 -> loopOverHand st pieces (index + 1u)
-            | _ -> []
-        | _ -> result
-
-    let rec loopOverHand2 (st: State.state) (pieces: Map<uint32, tile>) (index) (stepOver) =
+    let rec loopOverHand2 (st: State.state) (pieces: Map<uint32, tile>) (index) (stepOver) (reverse: bool) =
         let stepOverDict = stepOverList stepOver st.dict pieces
         let hand = MultiSet.toList st.hand
 
+        let word =
+            List.fold
+                (fun acc c ->
+                    match reverse with
+                    | true -> (getCharacter (getPiece pieces c)).ToString() + acc
+                    | false -> acc + (getCharacter (getPiece pieces c)).ToString())
+                ""
+                stepOver
+
         let result =
-            tryFindConsecutiveCombination st.hand pieces index [] stepOverDict "" stepOver
+            tryFindConsecutiveCombination st.hand pieces index [] stepOverDict word stepOver reverse
 
         match result with
         | [] ->
             match index with
-            | index when (int index) < hand.Length - 1 -> loopOverHand st pieces (index + 1u)
+            | index when (int index) < hand.Length - 1 -> loopOverHand2 st pieces (index + 1u) stepOver reverse
             | _ -> []
         | _ -> result
 
-
-    let largestOfThree (lst1: 'a list) (lst2: 'a list) (lst3: 'a list) =
+    let largestOfThree
+        ((x0, y0, lst1): 'a * 'b * 'c list)
+        ((x1, y1, lst2): 'a * 'b * 'c list)
+        ((x2, y2, lst3): 'a * 'b * 'c list)
+        =
         match lst1.Length with
-        | x when x > lst2.Length && x > lst3.Length -> lst1
-        | x when x > lst2.Length && x < lst3.Length -> lst3
-        | _ -> lst2
-
-    let partialTryFindConsecutive (st: State.state) (pieces) (move) =
-        tryFindConsecutiveCombination st.hand pieces 0u move st.dict ""
+        | x when x > lst2.Length && x > lst3.Length -> (x0, y0, lst1)
+        | x when x > lst2.Length && x < lst3.Length -> (x1, y1, lst2)
+        | _ -> (x2, y2, lst3)
 
     let rec goDown (direction: Direction) (trail: uint32 List) = []
 
@@ -193,84 +189,174 @@ module Scrabble =
         (trail: uint32 List)
         (pieces: Map<uint32, tile>)
         (word)
-        (stepOver)
         =
         let x, y = currentCoord
 
+        debugPrint ("Walker was called to action with trail: " + trail.ToString() + " \n")
+
         match direction with
         | Up ->
-            debugPrint "Im going up... \n"
+            debugPrint ("Im going Up, current coord: " + (x, y).ToString() + " \n")
 
             match coordHasPlacedTile (x, y + 1) st.awesomeBoard with
-            | true -> launchAndCompare st (x, y + 1) direction trail pieces word stepOver
+            | true ->
+                debugPrint ("Tile: " + (x, y + 1).ToString() + " has a placed tile \n")
+
+                launchAndCompare
+                    (x, y)
+                    st
+                    (x, y + 1)
+                    direction
+                    ((getTileFromCoordinate (x, y) st.awesomeBoard) :: trail)
+                    pieces
+                    word
+
             | false ->
-                match loopOverHand2 st pieces 0u trail with
-                | [] -> goDown Down trail
-                | lst -> largestOfThree lst (goDown Down trail) []
+                debugPrint ("Tile: " + (x, y + 1).ToString() + " has no placed tile \n")
+
+                match loopOverHand2 st pieces 0u trail true with
+                | [] -> ((x, y), Right, goDown Down trail)
+                | lst -> largestOfThree ((x, y), Up, lst) ((x, y), Down, (goDown Right trail)) ((x, y), Down, [])
         | Down ->
-            debugPrint "Im going down... \n"
+            debugPrint ("Im going down, current coord: " + (x, y).ToString() + " \n")
 
             match coordHasPlacedTile (x, y - 1) st.awesomeBoard with
-            | true -> launchAndCompare st (x, y - 1) direction trail pieces word stepOver
+            | true ->
+                debugPrint ("Tile: " + (x, y - 1).ToString() + " has a placed tile \n")
+
+                launchAndCompare
+                    (x, y)
+                    st
+                    (x, y - 1)
+                    direction
+                    ((getTileFromCoordinate (x, y) st.awesomeBoard) :: trail)
+                    pieces
+                    word
+
             | false ->
-                match loopOverHand2 st pieces 0u trail with
-                | [] -> goDown Up trail
-                | lst -> largestOfThree lst (goDown Up trail) []
+                debugPrint ("Tile: " + (x, y - 1).ToString() + " has no placed tile \n")
+
+                match loopOverHand2 st pieces 0u trail false with
+                | [] -> ((x, y), Right, goDown Up trail)
+                | lst -> largestOfThree ((x, y), Down, lst) ((x, y), Down, (goDown Right trail)) ((x, y), Down, [])
         | Left ->
-            debugPrint "Im going left... \n"
+            debugPrint ("Im going left, current coord: " + (x, y).ToString() + " \n")
 
             match coordHasPlacedTile (x - 1, y) st.awesomeBoard with
-            | true -> launchAndCompare st (x - 1, y) direction trail pieces word stepOver
+            | true ->
+                debugPrint ("Tile: " + (x - 1, y).ToString() + " has a placed tile \n")
+
+                launchAndCompare
+                    (x, y)
+                    st
+                    (x - 1, y)
+                    direction
+                    ((getTileFromCoordinate (x, y) st.awesomeBoard) :: trail)
+                    pieces
+                    word
+
             | false ->
-                match loopOverHand2 st pieces 0u trail with
-                | [] -> goDown Right trail
-                | lst -> largestOfThree lst (goDown Right trail) []
+                debugPrint ("Tile: " + (x - 1, y).ToString() + " has no placed tile \n")
+
+                match loopOverHand2 st pieces 0u trail true with
+                | [] -> ((x, y), Left, goDown Right trail)
+                | lst -> largestOfThree ((x, y), Left, lst) ((x, y), Down, (goDown Right trail)) ((x, y), Down, [])
         | Right ->
-            debugPrint "Im going right... \n"
+            debugPrint ("Im going right, current coord: " + (x, y).ToString() + " \n")
 
             match coordHasPlacedTile (x + 1, y) st.awesomeBoard with
-            | true -> launchAndCompare st (x + 1, y) direction trail pieces word stepOver
+            | true ->
+                debugPrint ("Tile: " + (x + 1, y).ToString() + " has a placed tile \n")
+
+                launchAndCompare
+                    (x, y)
+                    st
+                    (x + 1, y)
+                    direction
+                    ((getTileFromCoordinate (x, y) st.awesomeBoard) :: trail)
+                    pieces
+                    word
+
             | false ->
-                match loopOverHand2 st pieces 0u trail with
-                | [] -> goDown Left trail
-                | lst -> largestOfThree lst (goDown Left trail) []
+                debugPrint ("Tile: " + (x + 1, y).ToString() + " has no placed tile \n")
+
+                match loopOverHand2 st pieces 0u trail false with
+                | [] -> ((x, y), Right, goDown Left trail)
+                | lst -> largestOfThree ((x, y), Right, lst) ((x, y), Down, (goDown Right trail)) ((x, y), Down, [])
 
     and launchAndCompare
+        (fromCoord: coord)
         (st: State.state)
         (currentCoord: coord)
         (direction: Direction)
         (trail: uint32 List)
         (pieces: Map<uint32, tile>)
         (word)
-        (stepOver)
         =
+        debugPrint (
+            "I'm a launch and compare and i was called with trail "
+            + trail.ToString()
+            + "\n"
+        )
+
         match direction with
         | Up ->
-            let up = walker st currentCoord Up [] pieces word stepOver
-            let left = walker st currentCoord Left [] pieces word stepOver
-            let right = walker st currentCoord Right [] pieces word stepOver
-            largestOfThree up left right
+            let ((uX, uY), uD, uLst) = walker st currentCoord Up trail pieces word
+
+            debugPrint (
+                "Up from coordninate: "
+                + (uX, uY).ToString()
+                + " returned: "
+                + uLst.ToString()
+                + " in direction: "
+                + uD.ToString()
+                + " \n"
+            )
+
+            let ((lX, lY), lD, lLst) = walker st currentCoord Left [] pieces word
+            let ((rX, rY), rD, rLst) = walker st currentCoord Right [] pieces word
+            largestOfThree ((uX, uY + 1), uD, uLst) ((lX - 1, lY), lD, lLst) ((rX + 1, rY), rD, rLst)
         | Down ->
-            let down = walker st currentCoord Down trail pieces word stepOver
-            let left = walker st currentCoord Left [] pieces word stepOver
-            let right = walker st currentCoord Right [] pieces word stepOver
-            largestOfThree down left right
+            let ((dX, dY), dD, dLst) = walker st currentCoord Down trail pieces word
+            let ((lX, lY), lD, lLst) = walker st currentCoord Left [] pieces word
+            let ((rX, rY), rD, rLst) = walker st currentCoord Right [] pieces word
+            largestOfThree ((dX, dY - 1), dD, dLst) ((lX - 1, lY), lD, lLst) ((rX + 1, rY), rD, rLst)
         | Right ->
-            let right = walker st currentCoord Right trail pieces word stepOver
-            let up = walker st currentCoord Up [] pieces word stepOver
-            let down = walker st currentCoord Down [] pieces word stepOver
-            largestOfThree right up down
+            let ((rX, rY), rD, rLst) = walker st currentCoord Right trail pieces word
+            let ((uX, uY), uD, uLst) = walker st currentCoord Up [] pieces word
+            let ((dX, dY), dD, dLst) = walker st currentCoord Down [] pieces word
+            largestOfThree ((uX, uY + 1), uD, uLst) ((dX, dY - 1), dD, dLst) ((rX + 1, rY), rD, rLst)
         | Left ->
-            let left = walker st currentCoord Left trail pieces word stepOver
-            let up = walker st currentCoord Up [] pieces word stepOver
-            let down = walker st currentCoord Down [] pieces word stepOver
-            largestOfThree left up down
+            let ((lX, lY), lD, lLst) = walker st currentCoord Left trail pieces word
+            let ((uX, uY), uD, uLst) = walker st currentCoord Up [] pieces word
+            let ((dX, dY), dD, dLst) = walker st currentCoord Down [] pieces word
+            largestOfThree ((uX, uY + 1), uD, uLst) ((lX - 1, lY), lD, lLst) ((dX, dY - 1), dD, dLst)
 
-    let getPlayableMove pieces movesLst centerPos =
-        let x, y = centerPos
+    let getPlayableMove (direction: Direction) pieces movesLst fromPos =
+        let x, y = fromPos
 
-        let aux =
-            fst (List.fold (fun (lst, a) id -> (List.append (getMove pieces id x a) lst, a + 1)) ([], y) movesLst)
+        let (aux, _, _) =
+            match direction with
+            | Up ->
+                List.fold
+                    (fun (lst, a, b) id -> ((List.append (getMove pieces id a b) lst), a, b + 1))
+                    ([], x, y)
+                    movesLst
+            | Down ->
+                List.fold
+                    (fun (lst, a, b) id -> ((List.append (getMove pieces id a b) lst), a, b - 1))
+                    ([], x, y)
+                    movesLst
+            | Left ->
+                List.fold
+                    (fun (lst, a, b) id -> ((List.append (getMove pieces id a b) lst), a - 1, b))
+                    ([], x, y)
+                    movesLst
+            | Right ->
+                List.fold
+                    (fun (lst, a, b) id -> ((List.append (getMove pieces id a b) lst), a + 1, b))
+                    ([], x, y)
+                    movesLst
 
         match aux with
         | [] -> SMPass
@@ -284,11 +370,17 @@ module Scrabble =
 
     let playGame cstream (pieces: Map<uint32, tile>) (st: State.state) =
 
+        let fuck =
+            match tryGetTileFromCoordinate st.board.center st.awesomeBoard with
+            | Some x -> [ x ]
+            | None -> []
+
         let rec aux (st: State.state) =
             Print.printHand pieces (State.hand st)
             //let result = loopOverHand st pieces 0u
-            let result = walker st st.board.center Up [] pieces "" []
-            let ourMove = getPlayableMove pieces result st.lastPlayed
+            let (coord, dirction, result) = walker st st.board.center Up fuck pieces ""
+
+            let ourMove = getPlayableMove dirction pieces result coord
 
             let newHand = tempRem result st.hand
             debugPrint ("\n-------------- DEBUG START -----------------\n")
