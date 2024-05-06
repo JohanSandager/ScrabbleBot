@@ -22,6 +22,26 @@ let empty () = Leaf false
 
         Node(b, Map.add str.[0] (insert str.[1..] nextDict) r) *)
 
+let rec insert (word: string) (dict: Dict) =
+    match dict with
+    | Leaf _ when word.Length = 0 -> Leaf true
+    | Node(_, csDict) when word.Length = 0 -> Node(true, csDict)
+    | Leaf b ->
+        let tmp = csDict ()
+        let c = word.[0]
+        tmp.[c] <- insert word.[1..] (empty ())
+        Node(b, tmp)
+    | Node(b, dic) ->
+        let c = word.[0]
+
+        match dic.TryGetValue c with
+        | (true, value) ->
+            dic.[c] <- insert word.[1..] value
+            Node(b, dic)
+        | (false, _) ->
+            dic.[c] <- insert word.[1..] (empty ())
+            Node(b, dic)
+
 let rec lookup (str: string) (dict: Dict) =
     //ScrabbleUtil.DebugPrint.debugPrint ("Hey I am called, bruv.")
     match dict with
