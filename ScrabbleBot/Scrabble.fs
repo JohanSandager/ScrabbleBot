@@ -3,6 +3,7 @@
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
 open AwesomeBoard
+open MultiSet
 
 open System.IO
 
@@ -44,15 +45,15 @@ module State =
 
     type state =
         { board: Parser.board
-          ourBoard: Map<coord, uint32> // Coordinate to tile id
+          awesomeBoard: Map<coord, uint32> // Coordinate to tile id
           dict: Dictionary.Dict
           playerNumber: uint32
           hand: MultiSet.MultiSet<uint32>
           lastPlayed: coord }
 
-    let mkState b d pn h oB lP =
+    let mkState b d pn h aB lP =
         { board = b
-          ourBoard = oB
+          awesomeBoard = aB
           dict = d
           playerNumber = pn
           hand = h
@@ -62,35 +63,34 @@ module State =
     let dict st = st.dict
     let playerNumber st = st.playerNumber
     let hand st = st.hand
-    let ourBoard st = st.ourBoard
+    let ourBoard st = st.awesomeBoard
 
 module Scrabble =
     open StateMonad
-
 
     let getPiece (pieces: Map<uint32, tile>) (id: uint32) = Map.find id pieces
     let getCharacter (piece: tile) = Set.toList piece |> List.head |> fst
     let getPointValue (piece: tile) = Set.toList piece |> List.head |> snd
 
     let rec stepOverList (lst: uint32 list) dict pieces =
-        // debugPrint (lst.ToString() + "<- List should look like this \n")
+        //debugPrint (lst.ToString() + "<- List should look like this \n")
 
         match lst with
         | x :: xs ->
             let char = getCharacter (getPiece pieces x)
-            debugPrint ("Stepping over: " + char.ToString() + "\n")
+            //debugPrint ("Stepping over: " + char.ToString() + "\n")
             let step = Dictionary.step char dict
 
             match step with
             | Some(true, newDict) ->
-                debugPrint "Found word \n"
+                //debugPrint "Found word \n"
                 stepOverList xs newDict pieces
             | Some(false, newDict) ->
-                debugPrint "No word here, moving on... \n"
+                //debugPrint "No word here, moving on... \n"
                 stepOverList xs newDict pieces
             | None -> dict
         | [] ->
-            debugPrint "Done returning dict... \n"
+            //debugPrint "Done returning dict... \n"
             dict
 
     let getMove pieces id x y =
@@ -104,7 +104,7 @@ module Scrabble =
 
     /// Recursively tries to build a combination of consecutive letters in the hand that match a word, returns an empty list if no word was found.
     let rec tryFindConsecutiveCombination
-        (hand: uint32 list)
+        (handMultiset: MultiSet<uint32>)
         (pieces: Map<uint32, tile>)
         (i: uint32)
         (move)
@@ -112,6 +112,7 @@ module Scrabble =
         (word)
         (stepOver)
         =
+        let hand = MultiSet.toList handMultiset
         let id = hand.[(int i)]
         let tile = getPiece pieces id
         let char = getCharacter tile
@@ -119,36 +120,52 @@ module Scrabble =
         let newWord = (word + (char.ToString()))
         let dictToUseTemp = stepOverList stepOver dict pieces
 
-        // debugPrint ("Trying: " + newWord + "\n")
-        // debugPrint ("Hand: " + hand.ToString() + "\n")
+        //debugPrint ("Trying: " + newWord + "\n")
+        //ÆdebugPrint ("Hand: " + hand.ToString() + "\n")
 
         match Dictionary.step char dictToUseTemp with
         | Some(true, _) ->
-            // debugPrint ("Word found " + newWord + "\n")
+            //debugPrint ("Word found " + newWord + "\n")
             newMove
         | Some(false, newDict) ->
-            // debugPrint ("Nothing found for char " + (char.ToString()) + "\n")
+            //debugPrint ("Nothing found for char " + (char.ToString()) + "\n")
 
             match i with
             | i when (int i) < hand.Length - 1 ->
-                // debugPrint "Doing this... \n"
-                tryFindConsecutiveCombination hand pieces (i + 1u) newMove newDict newWord stepOver
+                //debugPrint "Doing this... \n"
+                tryFindConsecutiveCombination handMultiset pieces (i + 1u) newMove newDict newWord stepOver
             | _ ->
-                // debugPrint "Returning... \n"
+                //debugPrint "Returning... \n"
                 []
         | None ->
-            // debugPrint "No word down this path... \n"
+            //debugPrint "No word down this path... \n"
             []
 
     /// Recursively loops over every tile in the hand returning an empty list if no move was found, or a list of uint32 ids mapping to placable tiles.
     let rec loopOverHand (st: State.state) (pieces: Map<uint32, tile>) (index) =
-        let alreadInBoard = Map.fold (fun acc _ id -> List.append [ id ] acc) [] st.ourBoard
-        // debugPrint ("Already in board: " + alreadInBoard.ToString() + "\n")
+        let alreadInBoard =
+            Map.fold (fun acc _ id -> List.append [ id ] acc) [] st.awesomeBoard
+
+        debugPrint ("Already in board: " + alreadInBoard.ToString() + "\n")
         let stepOverDict = stepOverList (List.rev alreadInBoard) st.dict pieces
         let hand = MultiSet.toList st.hand
 
         let result =
-            tryFindConsecutiveCombination hand pieces index [] stepOverDict "" (List.rev alreadInBoard)
+            tryFindConsecutiveCombination st.hand pieces index [] stepOverDict "" (List.rev alreadInBoard)
+
+        match result with
+        | [] ->
+            match index with
+            | index when (int index) < hand.Length - 1 -> loopOverHand st pieces (index + 1u)
+            | _ -> []
+        | _ -> result
+
+    let rec loopOverHand2 (st: State.state) (pieces: Map<uint32, tile>) (index) (stepOver) =
+        let stepOverDict = stepOverList stepOver st.dict pieces
+        let hand = MultiSet.toList st.hand
+
+        let result =
+            tryFindConsecutiveCombination st.hand pieces index [] stepOverDict "" stepOver
 
         match result with
         | [] ->
@@ -158,30 +175,96 @@ module Scrabble =
         | _ -> result
 
 
-    (*
+    let largestOfThree (lst1: 'a list) (lst2: 'a list) (lst3: 'a list) =
+        match lst1.Length with
+        | x when x > lst2.Length && x > lst3.Length -> lst1
+        | x when x > lst2.Length && x < lst3.Length -> lst3
+        | _ -> lst2
+
+    let partialTryFindConsecutive (st: State.state) (pieces) (move) =
+        tryFindConsecutiveCombination st.hand pieces 0u move st.dict ""
+
+    let rec goDown (direction: Direction) (trail: uint32 List) = []
+
     let rec walker
+        (st: State.state)
         (currentCoord: coord)
-        placedTiles
         (direction: Direction)
         (trail: uint32 List)
-        (hand: uint32 list)
         (pieces: Map<uint32, tile>)
-        (i: uint32)
-        (move)
-        (dict)
         (word)
+        (stepOver)
         =
-        let (x, y) = currentCoord
+        let x, y = currentCoord
 
         match direction with
         | Up ->
-            match tryGetTileFromCoordinate (x, y + 1) placedTiles with
-            | Some v -> walker (x, y + 1) placedTiles (trail :: v)
-            | None -> tryFindConsecutiveCombination hand
-        | Down -> coordHasPlacedTile (x, y - 1) placedTiles
-        | Left -> coordHasPlacedTile (x - 1, y) placedTiles
-        | Right -> coordHasPlacedTile (x + 1, y) placedTiles
-        *)
+            debugPrint "Im going up... \n"
+
+            match coordHasPlacedTile (x, y + 1) st.awesomeBoard with
+            | true -> launchAndCompare st (x, y + 1) direction trail pieces word stepOver
+            | false ->
+                match loopOverHand2 st pieces 0u trail with
+                | [] -> goDown Down trail
+                | lst -> largestOfThree lst (goDown Down trail) []
+        | Down ->
+            debugPrint "Im going down... \n"
+
+            match coordHasPlacedTile (x, y - 1) st.awesomeBoard with
+            | true -> launchAndCompare st (x, y - 1) direction trail pieces word stepOver
+            | false ->
+                match loopOverHand2 st pieces 0u trail with
+                | [] -> goDown Up trail
+                | lst -> largestOfThree lst (goDown Up trail) []
+        | Left ->
+            debugPrint "Im going left... \n"
+
+            match coordHasPlacedTile (x - 1, y) st.awesomeBoard with
+            | true -> launchAndCompare st (x - 1, y) direction trail pieces word stepOver
+            | false ->
+                match loopOverHand2 st pieces 0u trail with
+                | [] -> goDown Right trail
+                | lst -> largestOfThree lst (goDown Right trail) []
+        | Right ->
+            debugPrint "Im going right... \n"
+
+            match coordHasPlacedTile (x + 1, y) st.awesomeBoard with
+            | true -> launchAndCompare st (x + 1, y) direction trail pieces word stepOver
+            | false ->
+                match loopOverHand2 st pieces 0u trail with
+                | [] -> goDown Left trail
+                | lst -> largestOfThree lst (goDown Left trail) []
+
+    and launchAndCompare
+        (st: State.state)
+        (currentCoord: coord)
+        (direction: Direction)
+        (trail: uint32 List)
+        (pieces: Map<uint32, tile>)
+        (word)
+        (stepOver)
+        =
+        match direction with
+        | Up ->
+            let up = walker st currentCoord Up [] pieces word stepOver
+            let left = walker st currentCoord Left [] pieces word stepOver
+            let right = walker st currentCoord Right [] pieces word stepOver
+            largestOfThree up left right
+        | Down ->
+            let down = walker st currentCoord Down trail pieces word stepOver
+            let left = walker st currentCoord Left [] pieces word stepOver
+            let right = walker st currentCoord Right [] pieces word stepOver
+            largestOfThree down left right
+        | Right ->
+            let right = walker st currentCoord Right trail pieces word stepOver
+            let up = walker st currentCoord Up [] pieces word stepOver
+            let down = walker st currentCoord Down [] pieces word stepOver
+            largestOfThree right up down
+        | Left ->
+            let left = walker st currentCoord Left trail pieces word stepOver
+            let up = walker st currentCoord Up [] pieces word stepOver
+            let down = walker st currentCoord Down [] pieces word stepOver
+            largestOfThree left up down
 
     let getPlayableMove pieces movesLst centerPos =
         let x, y = centerPos
@@ -203,51 +286,12 @@ module Scrabble =
 
         let rec aux (st: State.state) =
             Print.printHand pieces (State.hand st)
-            let result = loopOverHand st pieces 0u
-
+            //let result = loopOverHand st pieces 0u
+            let result = walker st st.board.center Up [] pieces "" []
             let ourMove = getPlayableMove pieces result st.lastPlayed
 
             let newHand = tempRem result st.hand
             debugPrint ("\n-------------- DEBUG START -----------------\n")
-
-            let testDic1 =
-                match (Dictionary.step 'B' st.dict) with
-                | Some(false, newDict) -> newDict
-
-            let testDic2 =
-                match (Dictionary.step 'E' testDic1) with
-                | Some(false, newDict) -> newDict
-
-            let testDic3 =
-                match (Dictionary.step 'N' testDic2) with
-                | Some(true, newDict) ->
-                    debugPrint ("Yayy")
-                    newDict
-
-            let testDic4 =
-                match (Dictionary.step 'N' testDic3) with
-                | Some(true, newDict) ->
-                    debugPrint "It is a word... \n"
-                    newDict
-                | Some(false, newDict) ->
-                    debugPrint "WTF \n"
-                    newDict
-                | None ->
-                    debugPrint "I don't even know no more... \n"
-                    st.dict
-
-            let testDic5 =
-                match (Dictionary.step 'E' testDic4) with
-                | Some(true, newDict) ->
-                    debugPrint "It is a word... \n"
-                    newDict
-                | Some(false, newDict) ->
-                    debugPrint "WTF \n"
-                    newDict
-                | None ->
-                    debugPrint "I don't even know no more... \n"
-                    st.dict
-
 
             debugPrint (result.ToString())
 
@@ -269,7 +313,7 @@ module Scrabble =
             | RCM(CMPlaySuccess(ms, points, newPieces)) ->
                 (* Successful play by you. Update your state (remove old tiles, add the new ones, change turn, etc) *)
                 let newMap =
-                    List.fold (fun acc x -> Map.add (fst x) (fst (snd x)) acc) st.ourBoard ms
+                    List.fold (fun acc x -> Map.add (fst x) (fst (snd x)) acc) st.awesomeBoard ms
 
                 debugPrint ((fst ms.[0]).ToString())
 

@@ -52,6 +52,7 @@ let main argv =
 
     let ourDict = ScrabbleUtil.Dictionary.mkDict words dictAPI false
 
+
     //let incorrectWords = ScrabbleUtil.Dictionary.test words 10 ourDict
     //ScrabbleUtil.DebugPrint.debugPrint (incorrectWords.ToString())
 
