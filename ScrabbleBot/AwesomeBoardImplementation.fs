@@ -7,9 +7,9 @@ type AwesomeBoard = Map<coord, uint32>
 
 
 type Direction =
-    | Up
+    //| Up
     | Down
-    | Left
+    //| Left
     | Right
 
 let coordHasPlacedTile (coord: coord) (placedTiles: Map<coord, uint32>) =

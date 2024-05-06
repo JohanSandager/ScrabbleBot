@@ -170,15 +170,14 @@ module Scrabble =
             | _ -> []
         | _ -> result
 
-    let largestOfThree
+    let largestofTwo
         ((x0, y0, lst1): 'a * 'b * 'c list)
         ((x1, y1, lst2): 'a * 'b * 'c list)
-        ((x2, y2, lst3): 'a * 'b * 'c list)
+
         =
         match lst1.Length with
-        | x when x > lst2.Length && x > lst3.Length -> (x0, y0, lst1)
-        | x when x > lst2.Length && x < lst3.Length -> (x1, y1, lst2)
-        | _ -> (x2, y2, lst3)
+        | x when x > lst2.Length -> (x0, y0, lst1)
+        | _ -> (x1, y1, lst2)
 
     let rec goDown (direction: Direction) (trail: uint32 List) = []
 
@@ -195,8 +194,8 @@ module Scrabble =
         debugPrint ("Walker was called to action with trail: " + trail.ToString() + " \n")
 
         match direction with
-        | Up ->
-            debugPrint ("Im going Up, current coord: " + (x, y).ToString() + " \n")
+        | Down ->
+            debugPrint ("Im going down, current coord: " + (x, y).ToString() + " \n")
 
             match coordHasPlacedTile (x, y + 1) st.awesomeBoard with
             | true ->
@@ -215,52 +214,8 @@ module Scrabble =
                 debugPrint ("Tile: " + (x, y + 1).ToString() + " has no placed tile \n")
 
                 match loopOverHand2 st pieces 0u trail true with
-                | [] -> ((x, y), Right, goDown Down trail)
-                | lst -> largestOfThree ((x, y), Up, lst) ((x, y), Down, (goDown Right trail)) ((x, y), Down, [])
-        | Down ->
-            debugPrint ("Im going down, current coord: " + (x, y).ToString() + " \n")
-
-            match coordHasPlacedTile (x, y - 1) st.awesomeBoard with
-            | true ->
-                debugPrint ("Tile: " + (x, y - 1).ToString() + " has a placed tile \n")
-
-                launchAndCompare
-                    (x, y)
-                    st
-                    (x, y - 1)
-                    direction
-                    ((getTileFromCoordinate (x, y) st.awesomeBoard) :: trail)
-                    pieces
-                    word
-
-            | false ->
-                debugPrint ("Tile: " + (x, y - 1).ToString() + " has no placed tile \n")
-
-                match loopOverHand2 st pieces 0u trail false with
-                | [] -> ((x, y), Right, goDown Up trail)
-                | lst -> largestOfThree ((x, y), Down, lst) ((x, y), Down, (goDown Right trail)) ((x, y), Down, [])
-        | Left ->
-            debugPrint ("Im going left, current coord: " + (x, y).ToString() + " \n")
-
-            match coordHasPlacedTile (x - 1, y) st.awesomeBoard with
-            | true ->
-                debugPrint ("Tile: " + (x - 1, y).ToString() + " has a placed tile \n")
-
-                launchAndCompare
-                    (x, y)
-                    st
-                    (x - 1, y)
-                    direction
-                    ((getTileFromCoordinate (x, y) st.awesomeBoard) :: trail)
-                    pieces
-                    word
-
-            | false ->
-                debugPrint ("Tile: " + (x - 1, y).ToString() + " has no placed tile \n")
-
-                match loopOverHand2 st pieces 0u trail true with
-                | [] -> ((x, y), Left, goDown Right trail)
-                | lst -> largestOfThree ((x, y), Left, lst) ((x, y), Down, (goDown Right trail)) ((x, y), Down, [])
+                | [] -> ((x, y), Right, goDown Right trail)
+                | lst -> largestofTwo ((x, y), Down, lst) ((x, y), Down, (goDown Right trail))
         | Right ->
             debugPrint ("Im going right, current coord: " + (x, y).ToString() + " \n")
 
@@ -281,8 +236,8 @@ module Scrabble =
                 debugPrint ("Tile: " + (x + 1, y).ToString() + " has no placed tile \n")
 
                 match loopOverHand2 st pieces 0u trail false with
-                | [] -> ((x, y), Right, goDown Left trail)
-                | lst -> largestOfThree ((x, y), Right, lst) ((x, y), Down, (goDown Right trail)) ((x, y), Down, [])
+                | [] -> ((x, y), Right, goDown Down trail)
+                | lst -> largestofTwo ((x, y), Right, lst) ((x, y), Down, (goDown Right trail))
 
     and launchAndCompare
         (fromCoord: coord)
@@ -294,64 +249,33 @@ module Scrabble =
         (word)
         =
         debugPrint (
-            "I'm a launch and compare and i was called with trail "
+            "I'm a launch and compare and i was called with trail: "
             + trail.ToString()
+            + " and direction: "
+            + direction.ToString()
             + "\n"
         )
 
         match direction with
-        | Up ->
-            let ((uX, uY), uD, uLst) = walker st currentCoord Up trail pieces word
-
-            debugPrint (
-                "Up from coordninate: "
-                + (uX, uY).ToString()
-                + " returned: "
-                + uLst.ToString()
-                + " in direction: "
-                + uD.ToString()
-                + " \n"
-            )
-
-            let ((lX, lY), lD, lLst) = walker st currentCoord Left [] pieces word
-            let ((rX, rY), rD, rLst) = walker st currentCoord Right [] pieces word
-            largestOfThree ((uX, uY + 1), uD, uLst) ((lX - 1, lY), lD, lLst) ((rX + 1, rY), rD, rLst)
         | Down ->
             let ((dX, dY), dD, dLst) = walker st currentCoord Down trail pieces word
-            let ((lX, lY), lD, lLst) = walker st currentCoord Left [] pieces word
             let ((rX, rY), rD, rLst) = walker st currentCoord Right [] pieces word
-            largestOfThree ((dX, dY - 1), dD, dLst) ((lX - 1, lY), lD, lLst) ((rX + 1, rY), rD, rLst)
+            largestofTwo ((dX, dY - 1), dD, dLst) ((rX + 1, rY), rD, rLst)
         | Right ->
             let ((rX, rY), rD, rLst) = walker st currentCoord Right trail pieces word
-            let ((uX, uY), uD, uLst) = walker st currentCoord Up [] pieces word
             let ((dX, dY), dD, dLst) = walker st currentCoord Down [] pieces word
-            largestOfThree ((uX, uY + 1), uD, uLst) ((dX, dY - 1), dD, dLst) ((rX + 1, rY), rD, rLst)
-        | Left ->
-            let ((lX, lY), lD, lLst) = walker st currentCoord Left trail pieces word
-            let ((uX, uY), uD, uLst) = walker st currentCoord Up [] pieces word
-            let ((dX, dY), dD, dLst) = walker st currentCoord Down [] pieces word
-            largestOfThree ((uX, uY + 1), uD, uLst) ((lX - 1, lY), lD, lLst) ((dX, dY - 1), dD, dLst)
+            largestofTwo ((dX, dY - 1), dD, dLst) ((rX + 1, rY), rD, rLst)
 
     let getPlayableMove (direction: Direction) pieces movesLst fromPos =
         let x, y = fromPos
 
         let (aux, _, _) =
             match direction with
-            | Up ->
-                List.fold
+            | Down ->
+                (List.fold
                     (fun (lst, a, b) id -> ((List.append (getMove pieces id a b) lst), a, b + 1))
                     ([], x, y)
-                    movesLst
-            | Down ->
-                List.fold
-                    (fun (lst, a, b) id -> ((List.append (getMove pieces id a b) lst), a, b - 1))
-                    ([], x, y)
-                    movesLst
-            | Left ->
-                List.fold
-                    (fun (lst, a, b) id -> ((List.append (getMove pieces id a b) lst), a - 1, b))
-                    ([], x, y)
-                    movesLst
+                    movesLst)
             | Right ->
                 List.fold
                     (fun (lst, a, b) id -> ((List.append (getMove pieces id a b) lst), a + 1, b))
@@ -378,13 +302,13 @@ module Scrabble =
         let rec aux (st: State.state) =
             Print.printHand pieces (State.hand st)
             //let result = loopOverHand st pieces 0u
-            let (coord, dirction, result) = walker st st.board.center Up fuck pieces ""
+            let (coord, dirction, result) = walker st st.board.center Down fuck pieces ""
 
             let ourMove = getPlayableMove dirction pieces result coord
 
             let newHand = tempRem result st.hand
             debugPrint ("\n-------------- DEBUG START -----------------\n")
-
+            debugPrint (dirction.ToString())
             debugPrint (result.ToString())
 
             debugPrint ("\n-------------- DEBUG END -----------------\n")
