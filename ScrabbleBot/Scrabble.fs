@@ -176,22 +176,44 @@ module Scrabble =
         =
         let x, y = coord
 
+        debugPrint (
+            "This the direction: "
+            + direction.ToString()
+            + " from coord "
+            + coord.ToString()
+            + "\n"
+        )
+
         match direction with
         | Down ->
-            match coordHasPlacedTile (x + 1, y) st.awesomeBoard with
-            | true ->
-                let tile = getTileFromCoordinate (x + 1, y) st.awesomeBoard
-                wordList Down (x + 1, y) st (lst @ [ (getCharacter (getPiece pieces tile)) ]) pieces
-            | false -> lst
-        | Right ->
             match coordHasPlacedTile (x, y + 1) st.awesomeBoard with
             | true ->
                 let tile = getTileFromCoordinate (x, y + 1) st.awesomeBoard
-                wordList Right (x, y + 1) st (lst @ [ (getCharacter (getPiece pieces tile)) ]) pieces
+                wordList Down (x, y + 1) st (lst @ [ (getCharacter (getPiece pieces tile)) ]) pieces
+            | false -> lst
+        | Right ->
+            match coordHasPlacedTile (x + 1, y) st.awesomeBoard with
+            | true ->
+                let tile = getTileFromCoordinate (x + 1, y) st.awesomeBoard
+                wordList Right (x + 1, y) st (lst @ [ (getCharacter (getPiece pieces tile)) ]) pieces
+            | false -> lst
+        | Up ->
+            match coordHasPlacedTile (x, y - 1) st.awesomeBoard with
+            | true ->
+                let tile = getTileFromCoordinate (x, y - 1) st.awesomeBoard
+                wordList Up (x, y - 1) st ([ (getCharacter (getPiece pieces tile)) ] @ lst) pieces
+            | false -> lst
+        | Left ->
+            match coordHasPlacedTile (x - 1, y) st.awesomeBoard with
+            | true ->
+                let tile = getTileFromCoordinate (x - 1, y) st.awesomeBoard
+                wordList Left (x - 1, y) st ([ (getCharacter (getPiece pieces tile)) ] @ lst) pieces
             | false -> lst
 
-    let getAppendedWordFromList (lst: char List) (x: char) =
-        List.fold (fun acc c -> acc + c.ToString()) (x.ToString()) lst
+
+    let getAppendedWordFromList (lst: char List) (lst2: char List) (x: char) =
+        let wordList = lst @ [ x ] @ lst2
+        List.fold (fun acc c -> acc + c.ToString()) "" wordList
 
     let rec isWordValidInAllDirections
         (direction: Direction)
@@ -208,11 +230,15 @@ module Scrabble =
             | [] -> true
             | z :: zs ->
                 let c = (getCharacter (getPiece pieces z))
-                let charList = wordList direction (x, y) st [] pieces
-                let word = getAppendedWordFromList charList c
+                let charListLeft = wordList Left (x, y) st [] pieces
+                let charListRight = wordList Right (x, y) st [] pieces
+                let word = getAppendedWordFromList charListLeft charListRight c
+                debugPrint ("Going down. Printing word: " + word + "\n")
 
                 match word.Length with
                 | x when x > 1 ->
+                    debugPrint ("From down: " + x.ToString() + "\n")
+
                     match Dictionary.lookup word st.dict with
                     | true -> isWordValidInAllDirections direction (x, y + 1) st zs pieces
                     | false -> false
@@ -222,11 +248,15 @@ module Scrabble =
             | [] -> true
             | z :: zs ->
                 let c = (getCharacter (getPiece pieces z))
-                let charList = wordList direction (x, y) st [] pieces
-                let word = getAppendedWordFromList charList c
+                let charListUp = wordList Up (x, y) st [] pieces
+                let charListDown = wordList Down (x, y) st [] pieces
+                let word = getAppendedWordFromList charListUp charListDown c
+                debugPrint ("Going Right. Printing word: " + word + "\n")
 
                 match word.Length with
                 | x when x > 1 ->
+                    debugPrint ("From right " + x.ToString() + "\n")
+
                     match Dictionary.lookup word st.dict with
                     | true -> isWordValidInAllDirections direction (x + 1, y) st zs pieces
                     | false -> false
@@ -283,6 +313,8 @@ module Scrabble =
                     match loopOverHand2 st pieces 0u tempTrail with
                     | [] -> walker st (x, y) Right [] pieces word (recursionLimit + 1)
                     | lst ->
+                        debugPrint ("Direction from down: " + direction.ToString() + "\n")
+
                         match isWordValidInAllDirections direction (x, y) st lst pieces with
                         | true -> ((x, y), Down, lst)
                         | false -> walker st (x, y) Right [] pieces word (recursionLimit + 1)
@@ -318,6 +350,8 @@ module Scrabble =
                     match loopOverHand2 st pieces 0u tempTrail with
                     | [] -> walker st (x, y) Down [] pieces word (recursionLimit + 1)
                     | lst ->
+                        debugPrint ("Direction from right: " + direction.ToString() + "\n")
+
                         match isWordValidInAllDirections direction (x, y) st lst pieces with
                         | true -> ((x, y), Right, lst)
                         | false -> walker st (x, y) Down [] pieces word (recursionLimit + 1)
