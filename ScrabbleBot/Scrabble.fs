@@ -125,31 +125,31 @@ module Scrabble =
         let word =
             List.fold (fun acc x -> acc + (getCharacter (getPiece pieces x)).ToString()) "" stepOver
 
-        debugPrint ("WROD:: " + word + " trying:; " + word + char.ToString() + "\n")
+        //debugPrint ("WROD:: " + word + " trying:; " + word + char.ToString() + "\n")
 
-        debugPrint ("tryFindCon stepover : " + stepOver.ToString() + "\n")
+        //debugPrint ("tryFindCon stepover : " + stepOver.ToString() + "\n")
 
         match Dictionary.step char dictToUseTemp with
         | Some(true, _) ->
-            debugPrint ("Word found " + word + char.ToString() + "\n")
+            //debugPrint ("Word found " + word + char.ToString() + "\n")
             newMove
         | Some(false, _) ->
-            debugPrint ("Nothing found for char " + (char.ToString()) + "\n")
+            //debugPrint ("Nothing found for char " + (char.ToString()) + "\n")
 
             match i with
             | i when (int i) < hand.Length - 1 ->
-                debugPrint "Doing this... \n"
+                //debugPrint "Doing this... \n"
 
                 tryFindConsecutiveCombination handMultiset pieces (i + 1u) newMove dict newWord (stepOver @ [ id ])
             | _ ->
-                debugPrint "Returning... \n"
+                //debugPrint "Returning... \n"
                 []
         | None ->
-            debugPrint ("No word down this path... char: " + char.ToString() + " \n")
+            //debugPrint ("No word down this path... char: " + char.ToString() + " \n")
             []
 
     let rec loopOverHand2 (st: State.state) (pieces: Map<uint32, tile>) (index) (stepOver) =
-        debugPrint ("loopOverHand stepover : " + stepOver.ToString() + "\n")
+        //debugPrint ("loopOverHand stepover : " + stepOver.ToString() + "\n")
         //let stepOverDict = stepOverList stepOver st.dict pieces
         let hand = toList st.hand
 
@@ -166,6 +166,67 @@ module Scrabble =
             | _ -> []
         | _ -> result
 
+
+    let rec wordList
+        (direction: Direction)
+        (coord: coord)
+        (st: State.state)
+        (lst: char List)
+        (pieces: Map<uint32, tile>)
+        =
+        let x, y = coord
+
+        match direction with
+        | Down ->
+            match coordHasPlacedTile (x + 1, y) st.awesomeBoard with
+            | true ->
+                let tile = getTileFromCoordinate (x + 1, y) st.awesomeBoard
+                wordList Down (x + 1, y) st (lst @ [ (getCharacter (getPiece pieces tile)) ]) pieces
+            | false -> lst
+        | Right ->
+            match coordHasPlacedTile (x, y + 1) st.awesomeBoard with
+            | true ->
+                let tile = getTileFromCoordinate (x, y + 1) st.awesomeBoard
+                wordList Right (x, y + 1) st (lst @ [ (getCharacter (getPiece pieces tile)) ]) pieces
+            | false -> lst
+
+    let getAppendedWordFromList (lst: char List) (x: char) =
+        List.fold (fun acc c -> acc + c.ToString()) (x.ToString()) lst
+
+    let rec isWordValidInAllDirections
+        (direction: Direction)
+        (coord: coord)
+        (st: State.state)
+        (lst: uint32 List)
+        (pieces: Map<uint32, tile>)
+        =
+        let x, y = coord
+
+        match direction with
+        | Down ->
+            match lst with
+            | [] -> true
+            | z :: zs ->
+                let c = (getCharacter (getPiece pieces z))
+                let charList = wordList direction (x, y) st [] pieces
+                let word = getAppendedWordFromList charList c
+
+                match Dictionary.lookup word st.dict with
+                | true -> isWordValidInAllDirections direction (x, y + 1) st zs pieces
+                | false -> false
+        | Right ->
+            match lst with
+            | [] -> true
+            | z :: zs ->
+                let c = (getCharacter (getPiece pieces z))
+                let charList = wordList direction (x, y) st [] pieces
+                let word = getAppendedWordFromList charList c
+
+                match Dictionary.lookup word st.dict with
+                | true -> isWordValidInAllDirections direction (x + 1, y) st zs pieces
+                | false -> false
+
+
     let rec walker
         (st: State.state)
         (currentCoord: coord)
@@ -173,37 +234,59 @@ module Scrabble =
         (trail: uint32 List)
         (pieces: Map<uint32, tile>)
         (word)
+        (recursionLimit: int)
         =
         let x, y = currentCoord
 
-        debugPrint ("Walker was called to action with trail: " + trail.ToString() + " \n")
+        debugPrint (
+            "Walker was called to action with trail: "
+            + trail.ToString()
+            + "with direction: "
+            + direction.ToString()
+            + "\n"
+        )
 
         match direction with
         | Down ->
-            debugPrint ("Im going down, current coord: " + (x, y).ToString() + " \n")
+            //debugPrint ("Im going down, current coord: " + (x, y).ToString() + " \n")
 
             match coordHasPlacedTile (x, y + 1) st.awesomeBoard with
             | true ->
-                debugPrint ("Tile: " + (x, y + 1).ToString() + " has a placed tile \n")
-                walker st (x, y + 1) Down (trail @ [ (getTileFromCoordinate currentCoord st.awesomeBoard) ]) pieces word
+                //debugPrint ("Tile: " + (x, y + 1).ToString() + " has a placed tile \n")
+                walker
+                    st
+                    (x, y + 1)
+                    Down
+                    (trail @ [ (getTileFromCoordinate currentCoord st.awesomeBoard) ])
+                    pieces
+                    word
+                    0
 
             | false ->
-                debugPrint ("Tile: " + (x, y + 1).ToString() + " has no placed tile \n")
+                //debugPrint ("Tile: " + (x, y + 1).ToString() + " has no placed tile \n")
+                match recursionLimit with
+                | x when x > 1 ->
+                    debugPrint ("You know the rules and so do I 1")
+                    ((x, y), Down, [])
+                | _ ->
+                    let tempTrail =
+                        match tryGetTileFromCoordinate currentCoord st.awesomeBoard with
+                        | Some x -> (trail @ [ x ])
+                        | None -> trail
 
-                let tempTrail =
-                    match tryGetTileFromCoordinate currentCoord st.awesomeBoard with
-                    | Some x -> (trail @ [ x ])
-                    | None -> trail
+                    match loopOverHand2 st pieces 0u tempTrail with
+                    | [] -> walker st (x, y) Right [] pieces word (recursionLimit + 1)
+                    | lst ->
+                        match isWordValidInAllDirections direction (x, y) st lst pieces with
+                        | true -> ((x, y), Down, lst)
+                        | false -> walker st (x, y) Right [] pieces word (recursionLimit + 1)
 
-                match loopOverHand2 st pieces 0u tempTrail with
-                | [] -> walker st (x, y) Right [] pieces word
-                | lst -> ((x, y), Down, lst)
         | Right ->
-            debugPrint ("Im going right, current coord: " + (x, y).ToString() + " \n")
+            //debugPrint ("Im going right, current coord: " + (x, y).ToString() + " \n")
 
             match coordHasPlacedTile (x + 1, y) st.awesomeBoard with
             | true ->
-                debugPrint ("Tile: " + (x + 1, y).ToString() + " has a placed tile \n")
+                //debugPrint ("Tile: " + (x + 1, y).ToString() + " has a placed tile \n")
 
                 walker
                     st
@@ -212,20 +295,26 @@ module Scrabble =
                     (trail @ [ (getTileFromCoordinate currentCoord st.awesomeBoard) ])
                     pieces
                     word
+                    0
 
             | false ->
-                debugPrint ("Tile: " + (x + 1, y).ToString() + " has no placed tile \n")
+                //debugPrint ("Tile: " + (x + 1, y).ToString() + " has no placed tile \n")
+                match recursionLimit with
+                | x when x > 1 ->
+                    debugPrint ("You know the rules and so do I 2")
+                    ((x, y), Down, [])
+                | _ ->
+                    let tempTrail =
+                        match tryGetTileFromCoordinate currentCoord st.awesomeBoard with
+                        | Some x -> (trail @ [ x ])
+                        | None -> trail
 
-                let tempTrail =
-                    match tryGetTileFromCoordinate currentCoord st.awesomeBoard with
-                    | Some x -> (trail @ [ x ])
-                    | None -> trail
-
-                match loopOverHand2 st pieces 0u tempTrail with
-                | [] ->
-                    debugPrint ("It's going down foreal \n")
-                    walker st (x, y) Down [] pieces word
-                | lst -> ((x, y), Right, lst)
+                    match loopOverHand2 st pieces 0u tempTrail with
+                    | [] -> walker st (x, y) Down [] pieces word (recursionLimit + 1)
+                    | lst ->
+                        match isWordValidInAllDirections direction (x, y) st lst pieces with
+                        | true -> ((x, y), Right, lst)
+                        | false -> walker st (x, y) Down [] pieces word (recursionLimit + 1)
 
     let getPlayableMove (direction: Direction) pieces movesLst fromPos (st: State.state) =
         let x, y = fromPos
@@ -286,7 +375,7 @@ module Scrabble =
         let rec aux (st: State.state) =
             Print.printHand pieces (State.hand st)
             //let result = loopOverHand st pieces 0u
-            let (coord, dirction, result) = walker st st.board.center Down fuck pieces ""
+            let (coord, dirction, result) = walker st st.board.center Down fuck pieces "" 0
 
             let ourMove = getPlayableMove dirction pieces result coord st
 
