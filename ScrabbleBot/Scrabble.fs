@@ -211,9 +211,12 @@ module Scrabble =
                 let charList = wordList direction (x, y) st [] pieces
                 let word = getAppendedWordFromList charList c
 
-                match Dictionary.lookup word st.dict with
-                | true -> isWordValidInAllDirections direction (x, y + 1) st zs pieces
-                | false -> false
+                match word.Length with
+                | x when x > 1 ->
+                    match Dictionary.lookup word st.dict with
+                    | true -> isWordValidInAllDirections direction (x, y + 1) st zs pieces
+                    | false -> false
+                | _ -> true
         | Right ->
             match lst with
             | [] -> true
@@ -222,9 +225,12 @@ module Scrabble =
                 let charList = wordList direction (x, y) st [] pieces
                 let word = getAppendedWordFromList charList c
 
-                match Dictionary.lookup word st.dict with
-                | true -> isWordValidInAllDirections direction (x + 1, y) st zs pieces
-                | false -> false
+                match word.Length with
+                | x when x > 1 ->
+                    match Dictionary.lookup word st.dict with
+                    | true -> isWordValidInAllDirections direction (x + 1, y) st zs pieces
+                    | false -> false
+                | _ -> true
 
 
     let rec walker
@@ -390,7 +396,7 @@ module Scrabble =
             forcePrint
                 "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
 
-            let input = System.Console.ReadLine()
+            //let input = System.Console.ReadLine()
 
             debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) ourMove) // keep the debug lines. They are useful.
             send cstream (ourMove)
