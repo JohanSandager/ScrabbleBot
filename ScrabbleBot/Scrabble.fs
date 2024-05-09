@@ -318,7 +318,7 @@ module Scrabble =
                     | lst ->
                         debugPrint ("Direction from down: " + direction.ToString() + "\n")
 
-                        match isWordValidInAllDirections direction (x, y) st lst pieces with
+                        match isWordValidInAllDirections direction (x, y + 1) st lst pieces with
                         | true -> ((x, y), Down, lst)
                         | false -> walker st (x, y) Right [] pieces word (recursionLimit + 1)
 
@@ -355,7 +355,7 @@ module Scrabble =
                     | lst ->
                         debugPrint ("Direction from right: " + direction.ToString() + "\n")
 
-                        match isWordValidInAllDirections direction (x, y) st lst pieces with
+                        match isWordValidInAllDirections direction (x + 1, y) st lst pieces with
                         | true -> ((x, y), Right, lst)
                         | false -> walker st (x, y) Down [] pieces word (recursionLimit + 1)
 
