@@ -234,6 +234,8 @@ module Scrabble =
                 let charListRight = wordList Right (x, y) st [] pieces
                 let word = getAppendedWordFromList charListLeft charListRight c
                 debugPrint ("Going down. Printing word: " + word + "\n")
+                debugPrint ("Direction is Down. This is the lst: " + lst.ToString() + "\n")
+
 
                 match word.Length with
                 | x when x > 1 ->
@@ -252,6 +254,7 @@ module Scrabble =
                 let charListDown = wordList Down (x, y) st [] pieces
                 let word = getAppendedWordFromList charListUp charListDown c
                 debugPrint ("Going Right. Printing word: " + word + "\n")
+                debugPrint ("Direction is Right. This is the lst: " + lst.ToString() + "\n")
 
                 match word.Length with
                 | x when x > 1 ->
