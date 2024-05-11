@@ -20,7 +20,4 @@ let main argv =
     let hand = [ 8u; 9u; 5u; 12u; 12u; 15u ]
     let result = tryMakeNewWordFromHand hand [ 8u ] 0 ourDict alphabetMap
     printf "%A" (result.ToString())
-    let result = findWordRecursive hand [ 8u ] ourDict alphabetMap
-    let word = idLstToString result alphabetMap
-    printf "%A" word
     0 // Return an integer exit code
