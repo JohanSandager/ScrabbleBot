@@ -17,11 +17,9 @@ let main argv =
     let alphabetMap =
         [ 'A' .. 'Z' ] |> List.mapi (fun i c -> uint32 (i + 1), (c, 2)) |> Map.ofList
 
-    let hand = [ 15u; 12u; 8u; 5u ] //[ 8u; 9u; 5u; 12u; 12u; 15u ]
-    let result = tryMakeNewWordFromHand hand [ 8u ] 0 ourDict alphabetMap
-    printf "%A \n" (result.ToString())
-
-    let res = getFirstWord hand ourDict alphabetMap []
+    let hand = [ 21u; 11u; 3u; 18u; 5u ]
+    let prev = [ 6u; 21u; 3u; 11u ]
+    let res = getFirstWord hand ourDict alphabetMap prev
     printf "%A \n" (res.ToString())
-    printf "%A \n" (idLstToString res alphabetMap)
+    printf "%A%A \n" (idLstToString prev alphabetMap) (idLstToString res alphabetMap)
     0 // Return an integer exit code
