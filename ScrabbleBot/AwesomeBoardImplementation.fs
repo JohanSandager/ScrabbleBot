@@ -11,3 +11,5 @@ type Direction =
     | Down
     | Left
     | Right
+
+let tryGetTile (board: AwesomeBoard) coord = Map.tryFind coord board

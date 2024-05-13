@@ -20,9 +20,11 @@ let main argv =
         |> Map.ofList
 
     let hand = [ 21u; 11u; 3u; 18u; 5u ]
-    let prev = [ 6u; 21u; 3u; 11u ]
-    let res = getFirstWord hand ourDict alphabetMap prev
+    let board = [ 6u; 21u; 3u; 11u ] |> List.mapi (fun i ui -> (i, 0), ui) |> Map.ofList
+    //let prev = [ 6u; 21u; 3u; 11u ]
+    //let res = getFirstWord hand ourDict alphabetMap prev
+    let res = walk board (0, 0) [] hand ourDict alphabetMap
     printf "%A \n" (res.ToString())
-    printf "%A%A \n" (idLstToString prev alphabetMap) (idLstToString res alphabetMap)
+    printf "%A \n" (idLstToString res alphabetMap)
     printf "%A \n" ((getMoves res alphabetMap).ToString())
     0 // Return an integer exit code

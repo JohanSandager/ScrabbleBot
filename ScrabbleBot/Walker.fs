@@ -2,6 +2,7 @@ module internal Walker
 
 open ScrabbleUtil.Dictionary
 open PieceFormatter
+open AwesomeBoard
 
 let copyList lst =
     List.fold (fun acc element -> List.append acc [ element ]) lst
@@ -60,3 +61,10 @@ let getMoves lst pieces =
         List.fold (fun (lst, x, y) z -> (lst @ (getMove pieces z x y)), x + 1, y) ([], 0, 0) lst
 
     lst
+
+let rec walk (board: AwesomeBoard) (coord: int * int) trail hand dict pieces =
+    let (x, y) = coord
+
+    match tryGetTile board coord with
+    | Some s -> walk board (x + 1, y) (trail @ [ s ]) hand dict pieces
+    | None -> getFirstWord hand dict pieces trail
