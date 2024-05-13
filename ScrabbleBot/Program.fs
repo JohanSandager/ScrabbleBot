@@ -23,8 +23,8 @@ let main argv =
     let board = [ 6u; 21u; 3u; 11u ] |> List.mapi (fun i ui -> (i, 0), ui) |> Map.ofList
     //let prev = [ 6u; 21u; 3u; 11u ]
     //let res = getFirstWord hand ourDict alphabetMap prev
-    let res = walk board (0, 0) [] hand ourDict alphabetMap
+    let (coord, res) = walk board (0, 0) [] hand ourDict alphabetMap
     printf "%A \n" (res.ToString())
     printf "%A \n" (idLstToString res alphabetMap)
-    printf "%A \n" ((getMoves res alphabetMap).ToString())
+    printf "%A \n" ((getMoves res alphabetMap coord).ToString())
     0 // Return an integer exit code

@@ -56,9 +56,11 @@ let getMove pieces id x y =
     let pointValue = getPointValueFromId id pieces
     [ ((x, y), (id, (char, pointValue))) ]
 
-let getMoves lst pieces =
+let getMoves lst pieces coord =
+    let mx, my = coord
+
     let (lst, _, _) =
-        List.fold (fun (lst, x, y) z -> (lst @ (getMove pieces z x y)), x + 1, y) ([], 0, 0) lst
+        List.fold (fun (lst, x, y) z -> (lst @ (getMove pieces z x y)), x + 1, y) ([], mx, my) lst
 
     lst
 
@@ -67,4 +69,4 @@ let rec walk (board: AwesomeBoard) (coord: int * int) trail hand dict pieces =
 
     match tryGetTile board coord with
     | Some s -> walk board (x + 1, y) (trail @ [ s ]) hand dict pieces
-    | None -> getFirstWord hand dict pieces trail
+    | None -> (coord, getFirstWord hand dict pieces trail)
