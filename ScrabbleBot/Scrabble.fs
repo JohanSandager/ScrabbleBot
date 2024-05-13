@@ -65,6 +65,7 @@ module State =
 
 module Scrabble =
     open System.Threading
+    open Walker
 
     let playGame cstream pieces (st: State.state) =
 
@@ -75,8 +76,9 @@ module Scrabble =
             forcePrint
                 "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
 
-            let input = System.Console.ReadLine()
-            let move = RegEx.parseMove input
+            //let input = System.Console.ReadLine()
+            let move =
+                getMoves (getFirstWord (MultiSet.toList st.hand) st.dict pieces []) pieces
 
             debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
             send cstream (SMPlay move)

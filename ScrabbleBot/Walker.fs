@@ -49,3 +49,14 @@ let getFirstWord (hand: uint32 list) dict pieces (trail: uint32 list) =
             hand
 
     aux hand stepOverDct pieces []
+
+let getMove pieces id x y =
+    let char = getCharFromId id pieces
+    let pointValue = getPointValueFromId id pieces
+    [ ((x, y), (id, (char, pointValue))) ]
+
+let getMoves lst pieces =
+    let (lst, _, _) =
+        List.fold (fun (lst, x, y) z -> (lst @ (getMove pieces z x y)), x + 1, y) ([], 0, 0) lst
+
+    lst
