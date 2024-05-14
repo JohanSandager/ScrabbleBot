@@ -83,9 +83,10 @@ module Scrabble =
             let (coord, dir, ids) =
                 walk st.awesomeBoard (0, 0) (MultiSet.toList st.hand) st.dict pieces
 
-            debugPrint (sprintf "Coord: %A; Dir: %A; Word: %A;\n" coord dir (idLstToString ids pieces))
+            //debugPrint (sprintf "Coord: %A; Dir: %A; Word: %A;\n" coord dir (idLstToString ids pieces))
 
             let move = getMoves ids pieces coord dir
+
             debugPrint (sprintf "%A\n" (dir.ToString()))
             debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
             send cstream (SMPlay move)
@@ -106,9 +107,6 @@ module Scrabble =
                 getIdsFromMove move
                 |> removePlayedPiecesFromHand oldHand
                 |> addNewPiecesToHand newPieces
-
-            let updateBoard oldBoard ms =
-                List.fold (fun acc x -> Map.add (fst x) (getIdFromPlacement x) acc) oldBoard ms
 
             match msg with
             | RCM(CMPlaySuccess(ms, points, newPieces)) ->
