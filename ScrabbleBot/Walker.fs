@@ -75,56 +75,40 @@ let isLongEnough (str: string) = str.Length > 1
 
 
 let isLetterValid board coord dict pieces =
-    //printf "----------------------------IS VALID----------------------------\n"
 
     let rec goRight trail coord =
         let x, y = coord
-        //printf "COORD RIGHT: %A\n" coord
 
         match tryGetTile board (x + 1, y) with
         | Some s -> goRight (trail @ [ s ]) (x + 1, y)
-        | None ->
-            //printf "RIGHT: %A\n" (idLstToString trail pieces)
-            trail
+        | None -> trail
 
     let rec goLeft trail coord =
         let x, y = coord
-        //printf "COORD LEFT: %A\n" coord
 
         match tryGetTile board (x - 1, y) with
         | Some s -> goLeft ([ s ] @ trail) (x - 1, y)
-        | None ->
-            //printf "LEFT: %A\n" (idLstToString trail pieces)
-            trail
+        | None -> trail
 
     let rec goUp trail coord =
         let x, y = coord
-        //printf "COORD UP: %A\n" coord
 
         match tryGetTile board (x, y - 1) with
         | Some s -> goUp ([ s ] @ trail) (x, y - 1)
-        | None ->
-            //printf "UP: %A\n" (idLstToString trail pieces)
-            trail
+        | None -> trail
 
     let rec goDown trail coord =
         let x, y = coord
-        //printf "COORD DOWN: %A\n" coord
 
         match tryGetTile board (x, y + 1) with
         | Some s -> goDown (trail @ [ s ]) (x, y + 1)
-        | None ->
-            //printf "DOWN: %A\n" (idLstToString trail pieces)
-            trail
+        | None -> trail
 
     let xWord =
         idLstToString ((goLeft [] coord) @ [ (getTile board coord) ] @ (goRight [] coord)) pieces
 
     let yWord =
         idLstToString ((goUp [] coord) @ [ (getTile board coord) ] @ (goDown [] coord)) pieces
-
-    //printf "X: %A; Y: %A;\n" xWord yWord
-    //printf "--------------------------IS VALID END--------------------------\n"
 
     (lookup xWord dict || not (isLongEnough xWord))
     && (lookup yWord dict || not (isLongEnough yWord))
@@ -142,11 +126,12 @@ let isValidElseEmpty board word dict pieces direction coord =
     let ms = getMoves word pieces coord direction
 
     let anyOccupiedTiles =
-        List.forall (fun x -> Map.containsKey x board) (getCoordsFromMoveLst ms)
+        List.forall (fun x -> not (Map.containsKey x board)) (getCoordsFromMoveLst ms)
+
 
     match
         (isValid (updateBoard board ms) (getCoordsFromMoveLst ms) dict pieces)
-        && not anyOccupiedTiles
+        && anyOccupiedTiles
     with
     | true -> word
     | false -> []
@@ -157,8 +142,6 @@ let walk (board: AwesomeBoard) (coord: int * int) hand dict pieces =
 
         match tryGetTile board coord with
         | Some s ->
-            //printf "Right %A\n" (idLstToString (getFirstWord hand dict pieces [ s ]) pieces)
-            //printf "DOWN: %A\n" (right board (x, y + 1) (trail @ [ s ]) hand dict pieces longestWord)
             getLargestDirTouple
                 (right board (x + 1, y) (trail @ [ s ]) hand dict pieces longestWord)
                 (down board (x, y + 1) ([ s ]) hand dict pieces longestWord)
@@ -172,9 +155,6 @@ let walk (board: AwesomeBoard) (coord: int * int) hand dict pieces =
 
         match tryGetTile board coord with
         | Some s ->
-            //printf "DOWN: %A\n" (idLstToString (getFirstWord hand dict pieces [ s ]) pieces)
-            //printf "DOWN: %A\n" (right board (x, y + 1) (trail @ [ s ]) hand dict pieces longestWord)
-
             getLargestDirTouple
                 (right board (x + 1, y) ([ s ]) hand dict pieces longestWord)
                 (down board (x, y + 1) (trail @ [ s ]) hand dict pieces longestWord)

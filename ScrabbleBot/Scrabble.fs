@@ -75,15 +75,9 @@ module Scrabble =
         let rec aux (st: State.state) =
             Print.printHand pieces (State.hand st)
 
-            // remove the force print when you move on from manual input (or when you have learnt the format)
-            forcePrint
-                "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
-
             //let input = System.Console.ReadLine()
             let (coord, dir, ids) =
                 walk st.awesomeBoard (0, 0) (MultiSet.toList st.hand) st.dict pieces
-
-            //debugPrint (sprintf "Coord: %A; Dir: %A; Word: %A;\n" coord dir (idLstToString ids pieces))
 
             let move = getMoves ids pieces coord dir
 
